@@ -77,13 +77,8 @@ for s_index = 1:length(sigma)
                    if jj == 0 % Check if the jj neighbor is a valid node
                        break
                    elseif ii~=jj % Check if jj is a different node (shouldn't be necessary as family already accounts for it)
-                       [~,check] = checkBondCrack(x(ii,:),x(jj,:),x1_crackIn,x2_crackIn);
-                       if ~check
-                           % Bond doesn't cross the crack initial segment
-                            [fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index));
-                       else
-                           fij = 0;
-                       end
+                       [checkBondCrack(x(ii,:),x(jj,:),x1_crackIn,x2_crackIn);
+                       [fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index));
                        Vj = partialAreas(ii,neig_index);
                        fn(ii,:) = fn(ii,:) + fij*Vj;
                    end
