@@ -1,4 +1,15 @@
-function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant)
+function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant,notch)
+%% INPUT
+% x_i: position of node i
+% x_j: position of node j
+% u_i: displacement of node i
+% u_j: displacement of node j
+% S_max_ant: maximum stretch for each given bond
+% notch: coordinates of the initial notch
+%% OUTPUT
+% f: vector state force between j and i nodes
+% S_max: maximum stretch for each bond
+%% CODE
     global c1 horizon omega
     xi = x_j - x_i; % \xi
     eta = u_j - u_i; % \eta
@@ -12,7 +23,7 @@ function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant)
         S_max = S_max_ant;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*fscalar(S*damageFactor(S_max))*ee;    
+    f = c1*influenceFunction(norma,horizon,omega)*fscalar(S*damageFactor(S_max,notch,x_i,x_j))*ee;    
 end
 
 function ff = fscalar(x)
@@ -28,13 +39,13 @@ else
 end
 end
 
-function mu = damageFactor(x)
-    global S0 S1
-    if x < S0(2) && x > -1
-        mu = 1;
-    elseif x > S0(2) && x < S1(2)
-        mu = (S1(2) - x)/(S1(2) - S0(2));
-    else
-        mu = 0;
-    end
-end
+%function mu = damageFactor(x)
+%     global S0 S1
+%     if x < S0(2) && x > -1
+%         mu = 1;
+%     elseif x > S0(2) && x < S1(2)
+%         mu = (S1(2) - x)/(S1(2) - S0(2));
+%     else
+%         mu = 0;
+%     end
+% end

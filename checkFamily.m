@@ -1,5 +1,5 @@
 %% Function to check the neighbourhood 
-function checkFamily(x,familyMat,ii)
+function checkFamily(x,familyMat,ii)%notch)
 family = familyMat(ii,:);
 ii_neigh = family(family~=0);
 plotname = "Family of the " + int2str(ii) + "-th node";

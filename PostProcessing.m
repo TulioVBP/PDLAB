@@ -8,6 +8,8 @@ function PostProcessing(x,u,n,phi)
 %% Plot the displacement and strain map
 displacementPlot(x,u(:,(2*n-1):2*n));
 %strainPlot(x,u(:,(2*n-1):2*n)); % To be perfected
+%% Plot the damage index
+damagePlot(x,phi(:,n)); 
 end
 
 
@@ -103,4 +105,39 @@ function displacementPlot(x,u)
     xlabel x
     ylabel y
     zlabel uy
+end
+
+function damagePlot(x,phi)
+    global a b
+    h = norm(x(1,:) - x(2,:));
+    % Transforming into a matrix array
+    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    PHI = zeros(size(X));
+    for jjj = 1:size(X,2)
+        for iii = 1:size(Y,1)
+            %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
+            %reliable
+            coord = [X(1,jjj) Y(iii,1)];
+            for ii = 1:length(x)
+               if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
+                   ind = ii;
+                   break;
+               end
+            end
+            if ~isempty(ind)
+                PHI(iii,jjj) = phi(ind);
+            else
+                disp('Error: problem with the matching condition')
+            end
+        end        
+    end
+    figure
+    pcolor(X,Y,PHI)
+    xlabel x
+    ylabel y
+    title('Damage index')
+    c = jet(1000);
+    colormap(c);
+    colorbar
+    caxis([0 1]);
 end

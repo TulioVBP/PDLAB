@@ -22,8 +22,8 @@ h_vec = horizon./m_vec; % [m]
 alpha = 0;
 omega = 3; % Influence function option
 c1 = 24*E/pi/horizon^3/(1-nu);
-crack_length = 0.05; % 5 cm
-x1_crackIn = [0 0.02]; x2_crackIn = [crack_length 0.02]; % Coordinates of the crack initial segment
+notch_length = 0.05; % 5 cm
+crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 
 %% SIMULATION
 for s_index = 1:length(sigma)
@@ -77,13 +77,14 @@ for s_index = 1:length(sigma)
                    if jj == 0 % Check if the jj neighbor is a valid node
                        break
                    elseif ii~=jj % Check if jj is a different node (shouldn't be necessary as family already accounts for it)
-                       [checkBondCrack(x(ii,:),x(jj,:),x1_crackIn,x2_crackIn);
-                       [fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index));
+                       % Bond doesn't cross the crack initial segment
+                       [fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index),crackIn);
                        Vj = partialAreas(ii,neig_index);
                        fn(ii,:) = fn(ii,:) + fij*Vj;
                    end
                end
-               phi(ii,n) = damageIndex(x,u_n(:,(2*n-1):(2*n)),family(ii,:),partialAreas(ii,:),ii); % Damage index
+               if ii = 
+               phi(ii,n) = damageIndex(x,u_n(:,(2*n-1):(2*n)),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index
             end
             % ############ VELOCITY VERLET ALGORITHM ###############
             %a_n = dt/2*M\(fn + bn); % Acceleration
