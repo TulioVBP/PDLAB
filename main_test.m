@@ -21,14 +21,14 @@ m_vec = 2; %[2 3 6 9]; % horizon number (last one should be 12 but we don't have
 h_vec = horizon./m_vec; % [m]
 alpha = 0;
 omega = 3; % Influence function option
-c1 = 24*E/pi/horizon^3/(1-nu);
+c1 = 24*(E*1e6)/pi/horizon^3/(1-nu); % Pa/m^3 = N / m^5
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 
 %% SIMULATION
 for s_index = 1:length(sigma)
     %% STRESS LOOP
-    stresses = [0 sigma(s_index) 0]; % [sigma_x, sigma_y, tau_xy]
+    stresses = [0 sigma(s_index) 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
     for m_index = 1:length(m_vec)
         %% HORIZON NUMBER LOOP
         % ###### GENERATE MESH #######
