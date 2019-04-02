@@ -6,7 +6,8 @@ function PostProcessing(x,u,n,phi)
 % - phi: damage index
 
 %% Plot the displacement and strain map
-displacementPlot(x,u(:,(2*n-1):2*n));
+%displacementPlot(x,u(:,(2*n-1):2*n));
+displacementPlot(x,u(:,:,n));
 %strainPlot(x,u(:,(2*n-1):2*n)); % To be perfected
 %% Plot the damage index
 damagePlot(x,phi(:,n)); 
