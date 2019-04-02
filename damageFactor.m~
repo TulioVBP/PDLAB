@@ -10,7 +10,7 @@ function mu = damageFactor(x,notch,x_i,x_j)
     global S0 S1 damageOn
     crackSegments = size(notch,1); % At least 2
     if damageOn
-        % With damage
+        % With dama
         for ii = 1:crackSegments-1
             [~,check(ii)] = checkBondCrack(x_i,x_j,notch(ii,:),notch(ii+1,:));
         end

@@ -4,7 +4,7 @@ clc
 close all
 
 %% PARAMETERS
-global a b alpha c1 horizon omega Sc S0 S1
+global a b alpha c1 horizon omega Sc S0 S1 damageOn
 % Material
 horizon = 1e-3; % [m]
 E = 72e3; % [MPa]
@@ -15,7 +15,7 @@ Sc = sqrt(5*pi*G0/9/(E*1e6)/horizon); % Critical elongation - conical micromodul
 S0 = [-0.98 0.95*Sc]; % S0- and S0+
 S1 = [-0.99 1.05*Sc]; % S1- and S1+
 % Simulation
-sigma = 10; % [MPa]
+sigma = 4; % [MPa]
 dt = 0.02e-6; % [sec]
 m_vec = 2; %[2 3 6 9]; % horizon number (last one should be 12 but we don't have enough space in memory) m = [2 3 6 12]
 h_vec = horizon./m_vec; % [m]
@@ -24,6 +24,7 @@ omega = 3; % Influence function option
 c1 = 24*(E*1e6)/pi/horizon^3/(1-nu); % Pa/m^3 = N / m^5
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
+damageOn = false; % True if applying damage to the model, false if not
 
 %% SIMULATION
 for s_index = 1:length(sigma)

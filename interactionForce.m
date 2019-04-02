@@ -27,15 +27,19 @@ function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant,notch)
 end
 
 function ff = fscalar(x)
-global S0 S1
-if x > S1(1) && x < S0(1) % (S1-,S0-)
-  ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
-elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]
-  ff = x;
-elseif x > S0(2) && x < S1(2) % (S0+,S1) 
-  ff = S0(2)*(S1(2)-x)/(S1(2) - S0(2));
+global S0 S1 damageOn
+if damageOn
+    if x > S1(1) && x < S0(1) % (S1-,S0-)
+      ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
+    elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]
+      ff = x;
+    elseif x > S0(2) && x < S1(2) % (S0+,S1) 
+      ff = S0(2)*(S1(2)-x)/(S1(2) - S0(2));
+    else
+      ff = 0;
+    end
 else
-  ff = 0;
+    ff = x;
 end
 end
 
