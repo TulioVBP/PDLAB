@@ -19,12 +19,25 @@ sigma = 4; % [MPa]
 dt = 0.02e-6; % [sec]
 m_vec = 2; %[2 3 6 9]; % horizon number (last one should be 12 but we don't have enough space in memory) m = [2 3 6 12]
 h_vec = horizon./m_vec; % [m]
-alpha = 0;
 omega = 3; % Influence function option
-c1 = 24*(E*1e6)/pi/horizon^3/(1-nu); % Pa/m^3 = N / m^5
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
+model = "Linearized LPS bond-based";
+switch model
+    case "PMB"
+        alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
+        %c1 = 24*(E*1e6)/pi/horizon^3/(1-nu); % Pa/m^3 = N / m^5
+        m = weightedVolume(horizon,omega);
+        c1 = 6*E*1e6/m;
+    case "Linearized LPS bond-based"
+        alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
+        m = weightedVolume(horizon,omega); 
+        c1 = 6*E*1e6/m;
+    otherwise
+        disp("Chosen model is not implemented or it was mistyped");
+        quit
+end
 
 %% SIMULATION
 for s_index = 1:length(sigma)
@@ -58,8 +71,9 @@ for s_index = 1:length(sigma)
         dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
         t = 0:dt:40e-6; % 40 micro-secs simulation
         % ########### INITIALIZE SIMULATION MATRICES ##############
-        %M = rho * eye(length(x)); % Inertia matrix
-        Minv = 1/rho * eye(length(x)); % Inverse of the inertial matrix
+        % M = rho * eye(length(x)); % Inertia matrix
+        % Minv = 1/rho * eye(length(x)); % Inverse of the inertial matrix
+        Minv = 1/rho; % Diagonal and with the same value: scalar
         S_max = zeros(length(x),maxNeigh);
         phi = zeros(length(x),length(t)); % No initial damage
         % Initial condition
@@ -80,13 +94,18 @@ for s_index = 1:length(sigma)
                    elseif ii~=jj % Check if jj is a different node (shouldn't be necessary as family already accounts for it)
                        % Bond doesn't cross the crack initial segment
                        %[fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index),crackIn);
-                       [fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,:,n),u_n(jj,:,n),S_max(ii,neig_index),crackIn);
-                       Vj = partialAreas(ii,neig_index);
-                       fn(ii,:) = fn(ii,:) + fij*Vj;
+                       switch model
+                           case "PMB"
+                           [fij,S_max(ii,neig_index)] = interactionForce_PMB(x(ii,:),x(jj,:),u_n(ii,:,n),u_n(jj,:,n),S_max(ii,neig_index),crackIn);
+                           case "Linearized LPS bond-based"
+                           [fij,S_max(ii,neig_index)] = interactionForce_LLPSBB(x(ii,:),x(jj,:),u_n(ii,:,n),u_n(jj,:,n),S_max(ii,neig_index),crackIn);
+                           otherwise
+                           disp("Chosen model is not implemented or it was mistyped");
+                           quit
+                       end
+                           Vj = partialAreas(ii,neig_index);
+                           fn(ii,:) = fn(ii,:) + fij*Vj;
                    end
-               end
-               if ii == 8074
-                  pausar = 1; 
                end
                %phi(ii,n) = damageIndex(x,u_n(:,(2*n-1):(2*n)),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index
                phi(ii,n) = damageIndex(x,u_n(:,:,n),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index

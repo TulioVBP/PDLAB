@@ -1,4 +1,4 @@
-function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant,notch)
+function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch)
 %% INPUT
 % x_i: position of node i
 % x_j: position of node j
@@ -23,7 +23,7 @@ function [f,S_max] = interactionForce(x_i,x_j,u_i,u_j,S_max_ant,notch)
         S_max = S_max_ant;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*fscalar(S*damageFactor(S_max,notch,x_i,x_j))*ee;    
+    f = c1*influenceFunction(norma,horizon,omega)*norma*fscalar(S*damageFactor(S_max,notch,x_i,x_j))*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|   
 end
 
 function ff = fscalar(x)

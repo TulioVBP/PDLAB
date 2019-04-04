@@ -1,4 +1,4 @@
-function m = weightedVolume(x,horizon,option)
+function m_anl = weightedVolume(horizon,option)
 %% Analytical 'm': m is equal inside all the domain, as if it was on the bulk
 % NBL MODEL
 % INPUT : 
@@ -12,11 +12,11 @@ function m = weightedVolume(x,horizon,option)
 % option - defines which influence function is used
 % ------
 % OUTPUT : 
-% m - Weighted Volume
+% m_anl - Weighted Volume
 % ------
 global alpha
-    N = size(x,1); % Number of nodes
-    m = ones(N,1); % Initializing the "m" vector
+    %N = size(x,1); % Number of nodes
+    %m = ones(N,1); % Initializing the "m" vector
     switch option
         case 1
             l = horizon/4.3;
@@ -55,5 +55,5 @@ global alpha
                  m_anl = pi*horizon^3/9;
             end
     end
-    m = m_anl*m;
+    %m = m_anl*m;
 end
