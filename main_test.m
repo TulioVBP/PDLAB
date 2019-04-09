@@ -24,6 +24,7 @@ notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
 model = "Linearized LPS bond-based";
+solver = "Dynamic/Explicit"; % "Quasi-Static"
 switch model
     case "PMB"
         alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
@@ -59,6 +60,7 @@ for s_index = 1:length(sigma)
             end
         end
         A = h^2*ones(length(x),1); % Elements' area
+        [ndof,idb,bc_set] = boundaryCondition(x);
         % Plot the mesh
 %         figure(1)
 %         plot(x(:,1),x(:,2),'o')
