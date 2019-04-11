@@ -4,7 +4,7 @@ clc
 close all
 
 %% PARAMETERS
-global a b alpha c1 horizon omega Sc S0 S1 damageOn
+global a b alpha c1 horizon omega Sc S0 S1 damageOn rho
 % Material
 horizon = 1e-3; % [m]
 E = 72e3; % [MPa]
@@ -24,17 +24,19 @@ notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
 model = "Linearized LPS bond-based";
-solver = "Dynamic/Explicit"; % "Quasi-Static"
+solver = "Quasi-Static"; % "Quasi-Static"
 switch model
     case "PMB"
         alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
         %c1 = 24*(E*1e6)/pi/horizon^3/(1-nu); % Pa/m^3 = N / m^5
         m = weightedVolume(horizon,omega);
         c1 = 6*E*1e6/m;
+        T = @interactionForce_PMB;
     case "Linearized LPS bond-based"
         alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
         m = weightedVolume(horizon,omega); 
         c1 = 6*E*1e6/m;
+        T = @interactionForce_LLPSBB;
     otherwise
         disp("Chosen model is not implemented or it was mistyped");
         quit
@@ -59,71 +61,23 @@ for s_index = 1:length(sigma)
                 x((ii-1)*M+jj,:) = [(jj-1)*h,(ii-1)*h];
             end
         end
-        A = h^2*ones(length(x),1); % Elements' area
-        [ndof,idb,bc_set] = boundaryCondition(x);
-        % Plot the mesh
-%         figure(1)
-%         plot(x(:,1),x(:,2),'o')
-%         grid on
-%         xlabel('x[m]')
-%         ylabel('y[m]')
+        A = h^2; % Elements' area
+        [ndof,idb,bc_set,bodyForce] = boundaryCondition(x,stresses,m,h,A);
         % ###### GENERATE FAMILY #######
         [family,partialAreas,maxNeigh] = generateFamily(x,horizon,m,m_index,true); % True for test
-        %% REAL TIME SIMULATION
-        dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
-        t = 0:dt:40e-6; % 40 micro-secs simulation
-        % ########### INITIALIZE SIMULATION MATRICES ##############
-        % M = rho * eye(length(x)); % Inertia matrix
-        % Minv = 1/rho * eye(length(x)); % Inverse of the inertial matrix
-        Minv = 1/rho; % Diagonal and with the same value: scalar
-        S_max = zeros(length(x),maxNeigh);
-        phi = zeros(length(x),length(t)); % No initial damage
-        % Initial condition
-        u_n = zeros(length(x),2,length(t)); % N x 2 x n  3D matrix
-        %u = zeros(size(x));
-        v_n = zeros(length(x),2*3); % Velocity Verlet matrix [i i+1/2 i+1]: by initializing it to zero, the rigid motion is eliminated.ffz
-        bn = bodyForce(x,stresses,m,h,A);
-        for n = 1:length(t)-1
-            %% TIME LOOP
-            fn = zeros(size(x));
-            for ii = 1:length(x)
-                % Loop on the nodes
-               for neig_index=1:size(family,2)
-                   % Loop on their neighbourhood
-                   jj = family(ii,neig_index); 
-                   if jj == 0 % Check if the jj neighbor is a valid node
-                       break
-                   elseif ii~=jj % Check if jj is a different node (shouldn't be necessary as family already accounts for it)
-                       % Bond doesn't cross the crack initial segment
-                       %[fij,S_max(ii,neig_index)] = interactionForce(x(ii,:),x(jj,:),u_n(ii,(2*n-1):(2*n)),u_n(jj,(2*n-1):(2*n)),S_max(ii,neig_index),crackIn);
-                       switch model
-                           case "PMB"
-                           [fij,S_max(ii,neig_index)] = interactionForce_PMB(x(ii,:),x(jj,:),u_n(ii,:,n),u_n(jj,:,n),S_max(ii,neig_index),crackIn);
-                           case "Linearized LPS bond-based"
-                           [fij,S_max(ii,neig_index)] = interactionForce_LLPSBB(x(ii,:),x(jj,:),u_n(ii,:,n),u_n(jj,:,n),S_max(ii,neig_index),crackIn);
-                           otherwise
-                           disp("Chosen model is not implemented or it was mistyped");
-                           quit
-                       end
-                           Vj = partialAreas(ii,neig_index);
-                           fn(ii,:) = fn(ii,:) + fij*Vj;
-                   end
-               end
-               %phi(ii,n) = damageIndex(x,u_n(:,(2*n-1):(2*n)),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index
-               phi(ii,n) = damageIndex(x,u_n(:,:,n),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index
-            end
-            % ############ VELOCITY VERLET ALGORITHM ###############
-            %a_n = dt/2*M\(fn + bn); % Acceleration
-            % Step 1 - Midway velocity
-            v_n(:,3:4) = v_n(:,1:2) + dt/2*Minv*(fn + bn); % V(n+1/2)
-            %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
-            u_n(:,:,n+1) = u_n(:,:,n) + dt*v_n(:,3:4); % u(n+1)
-            v_n(:,5:6) = v_n(:,3:4) + dt/2*Minv*(fn + bn); % V(n+1) - unnecessary
-            v_n(:,1:2) = v_n(:,5:6); % For the next iterative loop
-            % ############ COUNTING THE PROCESSING TIME #############
-            disp("Stress: "+ int2str(s_index) + " - Mesh: " +int2str(m_index) + " - Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")
-            %pause
-        end
+        %% SOLVER
+        switch solver
+            case "Dynamic/Explicit"
+                dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
+                t = 0:dt:40e-6; % 40 micro-secs simulation
+                [u_n,phi] = solver_DynamicExplicit(x,maxNeigh,t,idb,bodyForce,family,partialAreas,T,crackIn);
+            case "Quasi-Static"
+                n_tot = 4;
+                [un,r] = solver_QuasiStatic(x,n_tot,bodyForce,idb,family,partialAreas,T,ndof,A);
+            otherwise
+                disp("ERROR: Solver not yet implemented.")
+                quit
+        end    
     end
-    PostProcessing(x,u_n,n,phi);
 end
+PostProcessing(x,u_n,n,phi,idb);

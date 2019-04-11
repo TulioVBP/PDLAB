@@ -1,10 +1,12 @@
-function PostProcessing(x,u,n,phi)
+function PostProcessing(x,u,n,phi,idb)
 % Input: 
 % - x = [x y]: position matrix
 % - u: displacement matrix
 % - n: evaluation time
 % - phi: damage index
 
+%% Making u a 3D matrix
+u = threeDModification(x,u,idb);
 %% Plot the displacement and strain map
 %displacementPlot(x,u(:,(2*n-1):2*n));
 displacementPlot(x,u(:,:,n));
@@ -141,4 +143,18 @@ function damagePlot(x,phi)
     colormap(c);
     colorbar
     caxis([0 1]);
+end
+
+function u = threeDModification(x,u_2D,idb)
+    if length(u_2D) == 2*length(x)
+        u = zeros(length(x),2,size(u_2D,2));
+        for ii = 1:length(x)
+            dofi = [idb(2*ii-1) idb(2*ii)];
+            for n = 1:size(u_2D,2)
+                u(ii,:,n) = u_2D(dofi,n)';
+            end
+        end
+    else
+        u = u_2D;
+    end
 end

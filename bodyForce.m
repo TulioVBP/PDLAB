@@ -4,7 +4,10 @@ function b = bodyForce(x,stresses,m,h,A)
 % - stresses = [sigma_x sigma_y tau_xy]: applied normal and shear stresses
 % - m: number of spacings inside the horizon
 % - h: grid spacing
-% - A: element area vector
+% - A: element area vector or scalar
+if length(A) == 1
+    A = A*ones(length(x),1);
+end
     x_lim = [min(x(:,1)) max(x(:,1))]; % Horizontal bounds
     y_lim = [min(x(:,2)) max(x(:,2))]; % Vertical bounds
     l = x_lim(2) - x_lim(1); % Length

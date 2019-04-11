@@ -1,4 +1,4 @@
-function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant)
+function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x_i: position of node i
