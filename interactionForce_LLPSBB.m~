@@ -25,7 +25,7 @@ function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noF
         S_max = S_max_ant;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;    
+    f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*ee;    
 end
 
 function ff = fscalar(eta,versor,x)

@@ -23,7 +23,6 @@ function [u_n,phi] = solver_DynamicExplicit(x,maxNeigh,t,idb,b,familyMat,partial
                for jj = family
                    dofj = [idb(2*jj-1) idb(2*jj)];
                    % Loop on their neighbourhood
-                   noFail = ismember(ii,noFailZone) | ismember(jj,noFailZone); % True if node ii or jj is in the no fail zone
                    neig_index = find(familyMat(ii,:) == jj);
                    [fij,S_max(ii,neig_index)] = T(x(ii,:),x(jj,:),u_n(dofi,n)',u_n(dofj,n)',S_max(ii,neig_index),crackIn,noFail);
                    Vj = partialAreas(ii,neig_index);

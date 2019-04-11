@@ -1,4 +1,4 @@
-function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
+function [ndof,idb,bc_set,b] = boundaryCondition(x,stresses,m,h,A)
 %% INPUT parameter: 
 % - x: the nodes position 
 % - stresses: [sigma_x, sigma_y, tau_xy]
@@ -13,8 +13,7 @@ function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
 %                matrix is related to the 2nd dof freedom of the system
 % - bc_set: contains the set of constrained degrees of freedom on the first
 %           collumn and its corresponding value on the second collumn
-% - b: the actual body force vector
-% - noFail: set of nodes for which we have no fail condition (mu = 1 always)
+% - b: the actual body force 
     %% DEFINE THE BOUNDARY CONDITIONS
     bc_set = []; % Each degree of freedom have a index number related
     %% DEFINE THE IDB VECTOR
@@ -44,7 +43,7 @@ function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
          end
     end
     %% DEFINE THE BODY FORCE
-    [b_old,noFail] = bodyForce(x,stresses, m, h, A);
+    b_old = bodyForce(x,stresses, m, h, A);
     b = zeros(2*length(x),1);
     for ii = 1:length(b_old)
         dofi = [idb(2*ii-1) idb == (2*ii)];

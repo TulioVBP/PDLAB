@@ -23,8 +23,8 @@ omega = 3; % Influence function option
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
-model = "Linearized LPS bond-based";
-solver = "Quasi-Static"; % "Quasi-Static"
+model = "PMB"; % "PMB", "Linearized LPS bond-based"
+solver = "Dynamic/Explici"; % "Quasi-Static", "Dynamic/Explicit"
 switch model
     case "PMB"
         alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
@@ -44,10 +44,10 @@ end
 
 %% SIMULATION
 for s_index = 1:length(sigma)
-    %% STRESS LOOP
+    % STRESS LOOP
     stresses = [0 sigma(s_index) 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
     for m_index = 1:length(m_vec)
-        %% HORIZON NUMBER LOOP
+        % HORIZON NUMBER LOOP
         % ###### GENERATE MESH #######
         h = h_vec(m_index); % grid spacing [m]
         m = m_vec(m_index); 
@@ -62,15 +62,15 @@ for s_index = 1:length(sigma)
             end
         end
         A = h^2; % Elements' area
-        [ndof,idb,bc_set,bodyForce] = boundaryCondition(x,stresses,m,h,A);
+        [ndof,idb,bc_set,bodyForce,noFail] = boundaryCondition(x,stresses,m,h,A);
         % ###### GENERATE FAMILY #######
         [family,partialAreas,maxNeigh] = generateFamily(x,horizon,m,m_index,true); % True for test
-        %% SOLVER
+        % SOLVER
         switch solver
             case "Dynamic/Explicit"
                 dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
                 t = 0:dt:40e-6; % 40 micro-secs simulation
-                [u_n,phi] = solver_DynamicExplicit(x,maxNeigh,t,idb,bodyForce,family,partialAreas,T,crackIn);
+                [u_n,phi] = solver_DynamicExplicit(x,maxNeigh,t,idb,bodyForce,family,partialAreas,T,crackIn,noFail);
             case "Quasi-Static"
                 n_tot = 4;
                 [un,r] = solver_QuasiStatic(x,n_tot,bodyForce,idb,family,partialAreas,T,ndof,A);
@@ -80,4 +80,6 @@ for s_index = 1:length(sigma)
         end    
     end
 end
+
+%% POST-PROCESSING
 PostProcessing(x,u_n,n,phi,idb);

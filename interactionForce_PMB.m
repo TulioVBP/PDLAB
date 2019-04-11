@@ -1,4 +1,4 @@
-function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch)
+function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail)
 %% INPUT
 % x_i: position of node i
 % x_j: position of node j
@@ -6,6 +6,7 @@ function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch)
 % u_j: displacement of node j
 % S_max_ant: maximum stretch for each given bond
 % notch: coordinates of the initial notch
+% noFail: true if the damage is off for this specific bond
 %% OUTPUT
 % f: vector state force between j and i nodes
 % S_max: maximum stretch for each bond
@@ -23,7 +24,7 @@ function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch)
         S_max = S_max_ant;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*norma*fscalar(S*damageFactor(S_max,notch,x_i,x_j))*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|   
+    f = c1*influenceFunction(norma,horizon,omega)*norma*fscalar(S*damageFactor(S_max,notch,x_i,x_j)*noFail)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|   
 end
 
 function ff = fscalar(x)

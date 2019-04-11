@@ -1,6 +1,5 @@
 function [b,noFailZone] = bodyForce(x,stresses,m,h,A)
-% NEEDED UPDATE: Make it more general so that one can apply non-homogeneous
-%                traction forces
+% NEEDED UPDATE: Make it more general so that one can apply non-homogen
 %% INPUT:
 % - x = [x y]: nodes' position vector
 % - stresses = [sigma_x sigma_y tau_xy]: applied normal and shear stresses
@@ -34,12 +33,11 @@ end
     b = zeros(size(x));
     % Top layer
     b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
+    
     % Bottom layer
     b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
     % Left layer
     b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
     % Right layer
     b(rightLay,:) = b(rightLay,:) + [sigmax,tauxy]*h/m./A(rightLay);
-    %% Defining no fail zone
-    noFailZone = find(b(:,1)~= 0 | b(:,2)~= 0); % Criterion 1: if a traction force is applied to the node, it is no fail zone
 end
