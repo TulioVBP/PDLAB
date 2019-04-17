@@ -49,6 +49,5 @@ for ii = 1:N
 end
 f = (f - b)*V; % N
 % Change it to add boundary conditions
-penalty = 1e10;
 f(ndof+1:end) = penalty*bc_set(:,2); % The second collumn of bc_set represents the value of the constrain
 end
