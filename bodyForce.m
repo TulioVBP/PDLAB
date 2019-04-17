@@ -27,6 +27,11 @@ end
     topLay = find(x(:,2) > (y_lim(2) - m*h - 1e-12)); % Top layer nodes index
     leftLay = find(x(:,1) < (x_lim(1) + m*h + 1e-12)); % Left layer nodes index
     rightLay = find(x(:,1) > (x_lim(2) - m*h - 1e-12)); % Right layer nodes index
+    % Layers for no fail zone
+    bottomLayer = find(x(:,2) < (y_lim(1) + 3*m*h + 1e-12)); % Bottom layer nodes index
+    topLayer = find(x(:,2) > (y_lim(2) - 3*m*h - 1e-12)); % Top layer nodes index
+    %leftLayer = find(x(:,1) < (x_lim(1) + 3*m*h + 1e-12)); % Left layer nodes index
+    %rightLayer = find(x(:,1) > (x_lim(2) - 3*m*h - 1e-12)); % Right layer nodes index
     %% Applying constant Neumann boundary conditions
     sigmax = stresses(1);
     sigmay = stresses(2);
@@ -41,5 +46,8 @@ end
     % Right layer
     b(rightLay,:) = b(rightLay,:) + [sigmax,tauxy]*h/m./A(rightLay);
     %% Defining no fail zone
-    noFailZone = find(b(:,1)~= 0 | b(:,2)~= 0); % Criterion 1: if a traction force is applied to the node, it is no fail zone
+    noFailZone = zeros(length(x),1);    
+    noFailZone(topLayer) = true;
+    noFailZone(bottomLayer) = true;
+    %noFailZone = find(b(:,1)~= 0 | b(:,2)~= 0); % Criterion 1: if a traction force is applied to the node, it is no fail zone
 end

@@ -12,7 +12,8 @@ function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
 %        EXAMPLE: idb = [1 3 4 6 7 8] means that the thirf row of the stiffness
 %                matrix is related to the 2nd dof freedom of the system
 % - bc_set: contains the set of constrained degrees of freedom on the first
-%           collumn and its corresponding value on the second collumn
+%           collumn and its corresponding value on the second collumn; the
+%           third collumn contains the corresponding dof velocity
 % - b: the actual body force vector
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
     %% DEFINE THE BOUNDARY CONDITIONS
@@ -32,8 +33,12 @@ function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
     id_dof = 1;
     id_const = ndof+1;
     for ii=1:2*length(x)
-        check = sum(bc_set == ii);
-         if check ~= 1
+        if isempty(bc_set)
+            check = 0;
+        else
+            check = sum(bc_set(1,:) == ii);
+        end
+         if check == 0
              % Free degree of freedom
              idb(ii) = id_dof;
              id_dof = id_dof + 1;
@@ -43,11 +48,13 @@ function [ndof,idb,bc_set,b,noFail] = boundaryCondition(x,stresses,m,h,A)
              id_const = id_const + 1;
          end
     end
+    % Ensure compatibility between idb for constrained nodes and bc_set -
+    % TO BE DONE
     %% DEFINE THE BODY FORCE
     [b_old,noFail] = bodyForce(x,stresses, m, h, A);
     b = zeros(2*length(x),1);
     for ii = 1:length(b_old)
-        dofi = [idb(2*ii-1) idb == (2*ii)];
+        dofi = [idb(2*ii-1) idb(2*ii)];
         b(dofi) = b_old(ii,:)'; % Assigning the body force values to the collumn vector
     end
 end

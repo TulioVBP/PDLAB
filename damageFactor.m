@@ -1,13 +1,14 @@
-function mu = damageFactor(x,notch,x_i,x_j)
+function mu = damageFactor(x,notch,x_i,x_j,noFail)
 %% Input
 % x: stretch
 % crack: coordinates of the beginning and end points
 % x_i: position of node i
 % x_j: position of node j
+% noFail: true if one of the nodes is in a non fail zone
 %% Output
 % mu: damage factor
 %% CODE
-    global S0 S1 damageOn
+    global S0 S1 damageOn crackIn
     crackSegments = size(notch,1); % At least 2
     if damageOn
         % With damage
@@ -30,5 +31,10 @@ function mu = damageFactor(x,notch,x_i,x_j)
     else
         % No damage
         mu = 1;
+    end
+    if exist('noFail','var')~=0
+        if noFail == true
+            mu = 1;
+        end
     end
 end

@@ -1,10 +1,12 @@
-function PostProcessing(x,u,n,phi,idb)
+function PostProcessing(x,u,n,phi,W,idb)
 % Input: 
 % - x = [x y]: position matrix
+% - family = family matrix
 % - u: displacement matrix
 % - n: evaluation time
 % - phi: damage index
-
+% - W: strain energy density
+% - idb: come on, I know you know how this one works
 %% Making u a 3D matrix
 u = threeDModification(x,u,idb);
 %% Plot the displacement and strain map
@@ -157,4 +159,5 @@ function u = threeDModification(x,u_2D,idb)
     else
         u = u_2D;
     end
+    disp('Displacement vector converted');
 end

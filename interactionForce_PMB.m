@@ -15,7 +15,7 @@ function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail
     xi = x_j - x_i; % \xi
     eta = u_j - u_i; % \eta
     norma = norm(xi); 
-    S = (norm(eta+xi) - norm(xi))/norma; % Calculate stretch
+    S = (norm(eta+xi) - norma)/norma; % Calculate stretch
     ee = (eta + xi)/norm(eta+xi); % Versor
     % Updating maximum stretch
     if S > S_max_ant
@@ -24,7 +24,8 @@ function [f,S_max] = interactionForce_PMB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail
         S_max = S_max_ant;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*norma*fscalar(S*damageFactor(S_max,notch,x_i,x_j)*noFail)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|   
+    mu = damageFactor(S_max,notch,x_i,x_j,noFail); % If noFail is true then we will always have mu as one
+    f = c1*influenceFunction(norma,horizon,omega)*norma*fscalar(S*mu)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|   
 end
 
 function ff = fscalar(x)
@@ -43,14 +44,3 @@ else
     ff = x;
 end
 end
-
-%function mu = damageFactor(x)
-%     global S0 S1
-%     if x < S0(2) && x > -1
-%         mu = 1;
-%     elseif x > S0(2) && x < S1(2)
-%         mu = (S1(2) - x)/(S1(2) - S0(2));
-%     else
-%         mu = 0;
-%     end
-% end

@@ -1,4 +1,4 @@
-function phi = damageIndex(x,u,family,partialAreas,ii,notch,idb)
+function phi = damageIndex(x,u,family,partialAreas,ii,notch,idb,noFailZone)
 %% INPUT:
 % - x: nodes position
 % - u: nodes displacement
@@ -7,6 +7,7 @@ function phi = damageIndex(x,u,family,partialAreas,ii,notch,idb)
 % - ii: i-th node used
 % - notch: initial notch present in the material
 % - idb: indexing each dof to its position
+% - noFailZone: array with zeros and ones
 %% OUTPUT:
 % phi: damage index for the i-th node
 %% CODE
@@ -34,7 +35,8 @@ function phi = damageIndex(x,u,family,partialAreas,ii,notch,idb)
            eta = u_j - u_i; % \eta
            norma = norm(xi); 
            S = (norm(eta+xi) - norm(xi))/norma; % Calculate stretch
-           mu_j = damageFactor(S,notch,x_i,x_j); % Calculate damage factor
+           noFail = noFailZone(ii) || noFailZone(jj);
+           mu_j = damageFactor(S,notch,x_i,x_j,noFail); % Calculate damage factor
            areaTot = areaTot + partialAreas(familyIndex); % Integration on the area
            partialDamage = partialDamage + mu_j*partialAreas(familyIndex); % Integration on the partial damage
        else
