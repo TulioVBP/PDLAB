@@ -1,13 +1,12 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,T,ngdl)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,T,ndof)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-6; % According to the roadmap
-epsilon_vector = zeros(ngdl);
-% Initialize the tangent stiffness matrix to 0
-N = length(x);
+N = length(idb);
+epsilon_vector = zeros(N,1);
 %% Initialize the tangent stiffness matrix to zero
-K = zeros(2*N,2*N);
+K = zeros(N,N);
 %% Transverse each node in the discretization
 for ii=1:length(x)
     transvList = [ii family(ii,family(ii,:)~=0)]; % Node i and all neighbours of node i
@@ -23,12 +22,14 @@ for ii=1:length(x)
             for kk = family(ii,family(ii,:)~=0)
                 dofi = [idb(2*ii-1) idb(2*ii)];
                 dofk = [idb(2*kk-1) idb(2*kk)];
-                f_plus = T(x(ii,:),x(kk,:),u_plus(dofi),u_plus(dofk),0)*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero
-                f_minus = T(x(ii,:),x(kk,:),u_minus(dofi),u_minus(dofk),0)*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero again
+                [T_plus,~,~] = T(x(ii,:),x(kk,:),u_plus(dofi)',u_plus(dofk)');
+                [T_minus,~,~] = T(x(ii,:),x(kk,:),u_minus(dofi)',u_minus(dofk)');
+                f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero
+                f_minus = T_minus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero again
                 f_diff = f_plus - f_minus;
-                for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
-                    K(ss,rr) = K(ss,rr) + f_diff(ss+2*(1-kk))/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
-                end
+                %for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
+                    K(dofi,rr) = K(dofi,rr) + f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
+                %end
             end
             epsilon_vector(rr) = 0; % Resetting to zero
         end

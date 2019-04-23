@@ -1,4 +1,4 @@
-function PostProcessing(x,u,n,phi,W,idb)
+function PostProcessing(x,u,n,idb,phi,W)
 % Input: 
 % - x = [x y]: position matrix
 % - family = family matrix
@@ -14,7 +14,9 @@ u = threeDModification(x,u,idb);
 displacementPlot(x,u(:,:,n));
 %strainPlot(x,u(:,(2*n-1):2*n)); % To be perfected
 %% Plot the damage index
-damagePlot(x,phi(:,n)); 
+if exist('phi','var')~=0
+    damagePlot(x,phi(:,n));
+end
 end
 
 
@@ -75,7 +77,8 @@ function strainPlot(x,u)
 end
 
 function displacementPlot(x,u)
-    global a b
+    b = max(x(:,1) - min(x(:,1)));
+    a = max(x(:,2) - min(x(:,2)));
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
     [X,Y] = meshgrid(0:h:b, 0:h:a);
@@ -104,16 +107,19 @@ function displacementPlot(x,u)
     xlabel x
     ylabel y
     zlabel ux
+    set(gca,'FontSize',15)
     
     figure
     surf(X,Y,W)
     xlabel x
     ylabel y
     zlabel uy
+    set(gca,'FontSize',15)
 end
 
 function damagePlot(x,phi)
-    global a b
+    b = max(x(:,1) - min(x(:,1)));
+    a = max(x(:,2) - min(x(:,2)));
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
     [X,Y] = meshgrid(0:h:b, 0:h:a);
@@ -141,6 +147,7 @@ function damagePlot(x,phi)
     xlabel x
     ylabel y
     title('Damage index')
+    set(gca,'FontSize',15)
     c = jet(1000);
     colormap(c);
     colorbar

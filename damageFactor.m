@@ -10,6 +10,7 @@ function mu = damageFactor(x,notch,x_i,x_j,noFail)
 %% CODE
     global S0 S1 damageOn crackIn
     crackSegments = size(notch,1); % At least 2
+    check = [];
     if damageOn
         % With damage
         for ii = 1:crackSegments-1

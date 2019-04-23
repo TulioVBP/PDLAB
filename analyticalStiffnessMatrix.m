@@ -1,5 +1,5 @@
 % Function to generate the stiffness matrix for the quasi-static solver
-function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,m,V)
+function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,V)
 %% INPUT:
 % ------------------------------------------------------------
 % - x: position of the nodes
@@ -8,7 +8,6 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,m,V)
 % - horizon: peridynamic horizon of the simulation
 % - familySet: index of every node j (column) inside i (line) node's family
 % - partialArea: partial areas of node in j collumn to the ith node
-% - m: vector or scalar of weighted volume for each node
 % - V: scalar volume for each node
 % - t: width of the mesh
 %% OUTPUT:
@@ -18,9 +17,10 @@ global c1 horizon omega model
     penalty = 1e10;
     N = size(x,1);
     A = zeros(2*N,2*N); % 2N GDLs
-    switch model
+    m = weightedVolume(horizon,omega)*ones(length(x),1);
+    switch model.name
         case "Linearized LPS bond-based"
-            c = c1/2*weightVolume(horizon,option);
+            c = c1/2*weightedVolume(horizon,omega);
             for ii = 1:N
                 %node_i = ceil(ii/2); % Finding the node related to the
                 dofi = [idb(2*ii-1) idb(2*ii)];
@@ -32,12 +32,12 @@ global c1 horizon omega model
                     normaj = norm(xi);
                     omegaj = influenceFunction(normaj,horizon,omega);
                     % U
-                    if dofi(1) < ndof
+                    if dofi(1) <= ndof
                         % First dof of node ii is free
                         ti1u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialArea(ii,iII)*V; % Aii
                         ti2u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialArea(ii,iII)*V; % Aip
                         tj1u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialArea(ii,iII)*V;% Aij
-                        tj2u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialArea(ii,iII);*V% Aijp
+                        tj2u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialArea(ii,iII)*V;% Aijp
                         A(dofi(1),dofi(1)) = A(dofi(1),dofi(1)) + ti1u;
                         A(dofi(1),dofj(1)) = tj1u;
                         A(dofi(1),dofi(2)) = A(dofi(1),dofi(2)) + ti2u;
@@ -46,7 +46,7 @@ global c1 horizon omega model
                         % Constraint nodes
                         A(dofi(1),dofi(1)) = penalty;
                     end
-                    if dofi(2) < ndof
+                    if dofi(2) <= ndof
                         % V
                         ti1v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(2)*partialArea(ii,iII)*V;
                         ti2v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(2)*partialArea(ii,iII)*V;
@@ -64,7 +64,8 @@ global c1 horizon omega model
                     % Upload the neigh index
                     iII = iII + 1;
                 end
-            end  
+            end
+            A = -A;
         otherwise
             disp("Model not implemented.")
     end

@@ -1,4 +1,4 @@
-function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail)
+function [f,T,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x_i: position of node i
@@ -9,7 +9,9 @@ function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noF
 % notch: coordinates of the initial notch
 % noFail: true if the damage is off for this specific bond
 %% OUTPUT
-% f: vector state force between j and i nodes
+% f: vector internal force acting on node i due to the j-th node on its
+%    neighbourhood
+% T: vector state force acting on i by j 
 % S_max: maximum stretch for each bond
 %% CODE
     global c1 horizon omega
@@ -19,13 +21,21 @@ function [f,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noF
     S = (norm(eta+xi) - norm(xi))/norma; % Calculate stretch
     ee = xi/norma; % Versor
     % Updating maximum stretch
-    if S > S_max_ant
-        S_max = S;
+    if exist('S_max_ant','var') ~=0
+        if S > S_max_ant
+            S_max = S;
+        else
+            S_max = S_max_ant;
+        end
     else
-        S_max = S_max_ant;
+        S_max = S;
     end
     % Evaluating the force interaction
-    f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;    
+    if exist('noFail','var') == 0
+        noFail = 1;
+    end
+    f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;
+    T = f/2; % For this specific model
 end
 
 function ff = fscalar(eta,versor,x)
