@@ -4,7 +4,7 @@ clc
 close all
 
 %% PARAMETERS
-global a b alpha c1 horizon omega Sc S0 S1 damageOn rho crackIn model
+global alpha c1 c2 horizon omega Sc S0 S1 damageOn rho crackIn model
 % Material
 horizon = 1e-3; % [m]
 E = 72e3; % [MPa]
@@ -23,7 +23,7 @@ omega = 3; % Influence function option
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
-model.name = "Linearized LPS bond-based"; % "PMB", "Linearized LPS bond-based"
+model.name = "Linearized LPS bond-based"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
 solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit"
 switch model.name
     case "PMB"
@@ -42,12 +42,15 @@ switch model.name
         model.linearity = true;
         model.stiffnessAnal = true; % true if an analytical stiffness matrix for such model is implemented
     case "Lipton Free Damage"
+        alpha = 1;
+        mm = weightedVolume(horizon,omega);
+        c1 = 8*pi*horizon^3/mm*E*1e6/(1+nu);
+        c2 = (2*pi*horizon^3)^2/m^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu));
         T = @interactionForce_Lipton;
         model.linearity = true;
         model.stifnessAnal = false;
     otherwise
-        disp("Chosen model is not implemented or it was mistyped");
-        pause
+        error("Chosen model is not implemented or it was mistyped");
 end
 
 %% SIMULATION
@@ -56,36 +59,30 @@ for s_index = 1:length(sigma)
     stresses = [0 sigma(s_index) 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
     for m_index = 1:length(m_vec)
         % HORIZON NUMBER LOOP
-        %% ###### GENERATE MESH #######
+        %% -------------- Generate mesh -----------------
         h = h_vec(m_index); % grid spacing [m]
         m = m_vec(m_index); 
         a = 0.04/2; % height [m]
         b = 0.10/2; % length [m]
-        N = floor(a/h+1/2) + 1; % Number of rows
-        M = floor(b/h+1/2) + 1; % Number of collumns
-        x = zeros(N*M,2);
-        for ii = 1:N
-            for jj = 1:M
-                x((ii-1)*M+jj,:) = [(jj-1)*h,(ii-1)*h];
-            end
-        end
-        A = h^2; % Elements' area
-        %% Boundary conditions
+        [x,A] = generateMesh(h,[a b]); % Generates rectangular mesh 
+        %% -------------- Boundary conditions ----------------
         [ndof,idb,bc_set,bodyForce,noFailZone] = boundaryCondition(x,stresses,m,h,A);
-        %% ###### GENERATE FAMILY #######
+        %% -------------- GENERATE FAMILY ------------------
         [family,partialAreas,maxNeigh] = generateFamily(x,horizon,m,m_index,true); % True for test
-        % SOLVER
+        %% -------------- Generate history variables ------------------
+        history = historyDependency(x,maxNeigh);
+        %% -------------- SOLVER -------------------
         switch solver
             case "Dynamic/Explicit"
                 dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
                 t = 0:dt:40e-6; % 40 micro-secs simulation
                 n_tot = length(t);
-                [u_n,phi] = solver_DynamicExplicit(x,maxNeigh,t,idb,bodyForce,bc_set,family,partialAreas,T,crackIn,noFailZone);
+                [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,T,history,noFailZone);
             case "Quasi-Static"
                 n_tot = 2;
                 [u_n,r] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,ndof,A);
             otherwise
-                disp("ERROR: Solver not yet implemented.")
+                error("Solver not yet implemented.")
                 pause
         end    
     end
@@ -94,7 +91,7 @@ end
 %% POST-PROCESSING
 switch solver
     case "Dynamic/Explicit"
-        PostProcessing(x,u_n,n_tot,idb,phi);
+        PostProcessing(x,u_n,n_tot,idb,phi,energy);
     case "Quasi-Static"
         PostProcessing(x,u_n,n_tot,idb);
     otherwise

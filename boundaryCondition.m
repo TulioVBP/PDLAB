@@ -29,7 +29,9 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
         bc_set(:,1) = sort(bc_set(:,1));
         bc_set(:,2:3) = zeros(length(bc_set(:,1)),2);
     else
-        bc_set = [];
+        a = max(x(:,2));
+        bottomLay = find(x(:,2) == 0);
+        topLay = find(x(:,2) == a);
     end
     %% DEFINE THE IDB VECTOR
     ndof = 2*length(x) - length(bc_set);

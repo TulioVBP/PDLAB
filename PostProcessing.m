@@ -1,11 +1,11 @@
-function PostProcessing(x,u,n,idb,phi,W)
+function PostProcessing(x,u,n,idb,phi,energy)
 % Input: 
 % - x = [x y]: position matrix
 % - family = family matrix
 % - u: displacement matrix
 % - n: evaluation time
 % - phi: damage index
-% - W: strain energy density
+% - energy: struct variable with all the energies for the system
 % - idb: come on, I know you know how this one works
 %% Making u a 3D matrix
 u = threeDModification(x,u,idb);
@@ -16,6 +16,10 @@ displacementPlot(x,u(:,:,n));
 %% Plot the damage index
 if exist('phi','var')~=0
     damagePlot(x,phi(:,n));
+end
+%% Plot the total energy
+if exist('energy','var')~=0
+    energyPlot(energy,n);
 end
 end
 
@@ -154,8 +158,24 @@ function damagePlot(x,phi)
     caxis([0 1]);
 end
 
+function energyPlot(energy,n_final)
+   int = energy.W + energy.KE - energy.EW; % Total energy for each point
+   t = 1:1:n_final; % Number of time steps
+   figure
+   plot(t,sum(energy.W(:,1:n_final)),'--','LineWidth',1.5)
+   hold on
+   plot(t,sum(energy.KE(:,1:n_final)),'-.','LineWidth',1.5)
+   plot(t,sum(energy.EW(:,1:n_final)),'.','LineWidth',1.5)
+   plot(t,sum(int(:,1:n_final)),'-','LineWidth',1.5)
+   legend('Strain energy','Kinetic energy','External work','Total internal energy')
+   xlabel('Time step n')
+   ylabel('Energy (J/m)')
+   set(gca,'FontSize',15)
+   grid on
+end
+
 function u = threeDModification(x,u_2D,idb)
-    if length(u_2D) == 2*length(x)
+    if size(u_2D,1) == 2*length(x)
         u = zeros(length(x),2,size(u_2D,2));
         for ii = 1:length(x)
             dofi = [idb(2*ii-1) idb(2*ii)];

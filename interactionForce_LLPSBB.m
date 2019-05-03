@@ -1,4 +1,4 @@
-function [f,T,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,noFail)
+function [f,history] = interactionForce_LLPSBB(x,u,ii,dof_vec,familyMat,neighIndex,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x_i: position of node i
@@ -15,10 +15,14 @@ function [f,T,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,n
 % S_max: maximum stretch for each bond
 %% CODE
     global c1 horizon omega
+    jj = familyMat(ii,neighIndex);
+    x_i = x(ii,:); x_j = x(jj,:);
+    dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x_j - x_i; % \xi
+    u_i = u(dofi)'; u_j = u(dofj)';
     eta = u_j - u_i; % \eta
     norma = norm(xi); 
-    S = (norm(eta+xi) - norm(xi))/norma; % Calculate stretch
+    S = dot(eta,xi)/norma^2; % Calculate stretch - linear
     ee = xi/norma; % Versor
     % Updating maximum stretch
     if exist('S_max_ant','var') ~=0
@@ -35,7 +39,7 @@ function [f,T,S_max] = interactionForce_LLPSBB(x_i,x_j,u_i,u_j,S_max_ant,notch,n
         noFail = 1;
     end
     f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;
-    T = f/2; % For this specific model
+    history = 0; % For this specific model
 end
 
 function ff = fscalar(eta,versor,x)

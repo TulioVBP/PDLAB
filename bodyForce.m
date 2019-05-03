@@ -17,6 +17,9 @@ end
     y_lim = [min(x(:,2)) max(x(:,2))]; % Vertical bounds
     l = x_lim(2) - x_lim(1); % Length
     hh = y_lim(2) - y_lim(1); % Height
+    % Correcting the limits
+    x_lim = [min(x(:,1))-h/2 max(x(:,1))+h/2]; % Horizontal bounds
+    y_lim = [min(x(:,2))-h/2 max(x(:,2))+h/2]; % Vertical bounds
     %% Defining the edges indexes
 %     bottom = find(x(:,2) == y_lim(1)); % Bottom edge nodes index
 %     top = find(x(:,2) == y_lim(2)); % Top edge nodes index
@@ -40,7 +43,7 @@ end
     % Top layer
     b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
     % Bottom layer
-    b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
+    %b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
     % Left layer
     b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
     % Right layer
