@@ -1,4 +1,4 @@
-function [f,history] = interactionForce_PMB(x,u,ii,dof_vec,familyMat,neighIndex,dt,history,noFail)
+function [f,history] = interactionForce_PMB(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,dt,history,noFail)
 %% INPUT
 % x_i: position of node i
 % x_j: position of node j

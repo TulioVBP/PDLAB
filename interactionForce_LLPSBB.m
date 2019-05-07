@@ -1,4 +1,4 @@
-function [f,history] = interactionForce_LLPSBB(x,u,ii,dof_vec,familyMat,neighIndex,dt,history,noFail)
+function [f,history] = interactionForce_LLPSBB(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x_i: position of node i

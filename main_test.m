@@ -23,8 +23,8 @@ omega = 3; % Influence function option
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 damageOn = false; % True if applying damage to the model, false if not
-model.name = "Linearized LPS bond-based"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
-solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit"
+model.name = "PMB"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
+solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit"
 switch model.name
     case "PMB"
         alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
@@ -34,6 +34,17 @@ switch model.name
         T = @interactionForce_PMB;
         model.linearity = false;
         model.stiffnessAnal = false;
+    case "Linearized LPS"
+        nu = 1/4;
+        alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
+        mm = weightedVolume(horizon,omega); 
+        lambda = E*nu/(1+nu)/(1-2*nu); mu = E/2/(1+nu);
+        k = mu*(3*lambda + 2*mu)/(lambda + 2*mu);
+        c1 = (2*k - 4*mu)*1e6/mm;
+        c2 = 8*mu*1e6/mm;
+        T = @interactionForce_LLPS;
+        model.linearity = true;
+        model.stiffnessAnal = false; % true if an analytical stiffness matrix for such model is implemented
     case "Linearized LPS bond-based"
         alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
         mm = weightedVolume(horizon,omega); 
@@ -45,10 +56,10 @@ switch model.name
         alpha = 1;
         mm = weightedVolume(horizon,omega);
         c1 = 8*pi*horizon^3/mm*E*1e6/(1+nu);
-        c2 = (2*pi*horizon^3)^2/m^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu));
+        c2 = (2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu));
         T = @interactionForce_Lipton;
         model.linearity = true;
-        model.stifnessAnal = false;
+        model.stiffnessAnal = false;
     otherwise
         error("Chosen model is not implemented or it was mistyped");
 end
@@ -57,7 +68,7 @@ end
 for s_index = 1:length(sigma)
     % STRESS LOOP
     stresses = [0 sigma(s_index) 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
-    for m_index = 1:length(m_vec)
+    for m_index = 1:1%length(m_vec)
         % HORIZON NUMBER LOOP
         %% -------------- Generate mesh -----------------
         h = h_vec(m_index); % grid spacing [m]
@@ -79,7 +90,7 @@ for s_index = 1:length(sigma)
                 n_tot = length(t);
                 [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,T,history,noFailZone);
             case "Quasi-Static"
-                n_tot = 2;
+                n_tot = 1;
                 [u_n,r] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,ndof,A);
             otherwise
                 error("Solver not yet implemented.")

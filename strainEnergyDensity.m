@@ -17,7 +17,7 @@ global c1 horizon omega model
                     w = c1*influenceFunction(norma,horizon,omega)*norma^2*p*mu/2;
                 case "Linearized LPS bond-based"
                     extension = dot(eta,xi)/norma;
-                    w = c1*influenceFunction(norma,horizon,omega)*extension^2/2;
+                    w = 1/2*c1*influenceFunction(norma,horizon,omega)*extension^2/2;
                 otherwise
                     break
             end
@@ -42,7 +42,7 @@ function p = antiderivative(x)
     elseif x < S0(1)
         p = S0(1)/(S0(1) - S1(1))*(x^2/2 - S1(1)*x) + C(1);
     elseif x < S0(2)
-        p = x^2 + C(2);
+        p = x^2/2 + C(2);
     elseif x < S1(2)
         p = S0(2)/(S1(2) - S0(2))*(S1(2)*x - x^2/2) + C(3);
     else

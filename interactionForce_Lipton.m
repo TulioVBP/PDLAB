@@ -1,4 +1,4 @@
-function [f,history_up] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,neighIndex,history,dt,noFail)
+function [f,history_up] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,history,dt,noFail)
 %% INPUT
 % x_i: position of node i
 % x_j: position of node j
@@ -27,6 +27,12 @@ function [f,history_up] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,neigh
     if ~exist('noFail','var')
         noFail = 0;
     end
+    if ~exist('history','var')
+        history = [0 0 0];
+    end
+    if ~exist('dt','var')
+       dt = 0; 
+    end
     %% Evaluating the force interaction
     V_delta = pi*horizon^2; % Not sure if this is the right expression
     % ---- Evaluating the damage factor Ht
@@ -39,22 +45,26 @@ function [f,history_up] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,neigh
     % -- Evaluating the dilatation
     % Dilatation term
     theta_i = 0;
+    neighIndex2 = 1;
     for kk = familyMat(ii,familyMat(ii,:)~=0)
         zeta = x(kk,:) - x(ii,:);
         dofk = dof_vec(kk,:);
         u_k = u(dofk)';
         eta_2 = u_k - u_i;
         S_z = dot(zeta,eta_2)/norm(zeta)^2;
-        theta_i = theta_i + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z;
+        theta_i = theta_i + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z*partialAreas(ii,neighIndex2);
+        neighIndex2 = neighIndex2  + 1;
     end
     theta_j = 0;
+    neighIndex2 = 1;
     for kk = familyMat(jj,familyMat(jj,:)~=0)
         zeta = x(kk,:) - x(jj,:);
         dofk = dof_vec(kk,:);
         u_k = u(dofk)';
         eta_2 = u_k - u_j;
         S_z = dot(zeta,eta_2)/norm(zeta)^2;
-        theta_j = theta_j + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z;
+        theta_j = theta_j + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z*partialAreas(jj,neighIndex2);
+        neighIndex2 = neighIndex2  + 1;
     end
     thetac_p = 0.01;
     thetac_m = 0.01;

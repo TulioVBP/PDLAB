@@ -72,7 +72,7 @@ for ii = 1:N
         dofj = dof_vec(jj,:);
         u_j = u(dofj)';
         %[fij,~] = T(x(ii,:),x(jj,:),u_i,u_j,0,[]); % Density vector force
-        [fij,~] = T(x,u,ii,dof_vec,familyMat,neighIndex);
+        [fij,~] = T(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex);
         Vj = partialAreas(ii,familyMat(ii,:) == jj);
         f(dofi) = f(dofi) + (fij')*Vj; % N/m^3
         neighIndex = neighIndex + 1;
