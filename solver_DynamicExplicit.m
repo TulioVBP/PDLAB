@@ -34,9 +34,25 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
         energy.W = zeros(length(x),length(t));
         energy.KE = zeros(length(x),length(t));
         energy.EW = zeros(length(x),length(t));
+        fn = zeros(2*length(x),1); % Initial force
         for n = 1:length(t)-1
             %% TIME LOOP
-            fn = zeros(2*length(x),1);
+            % ############ VELOCITY VERLET ALGORITHM ###############
+            % ---- Solving for the dof ----
+            % #### Step 1 - Midway velocity
+            v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1/2)
+            % #### Step 2 - Update displacement
+            u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
+             % ----- Solving for the constraint nodes ----
+            u_const = zeros(length(v_n)-(ndof),1);
+            if ~isempty(u_const)
+                u_const(bc_set(:,3) == 0) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity
+                u_const = u_const + bc_set(:,3)*dt;
+                u_n(ndof+1:end,n+1) = u_n(ndof+1:end,n) + u_const;
+            end
+            % ### Step 3 - Update velocity
+            % Evaluate f[n+1]
+            fn = zeros(2*length(x),1); % Instatiate force vector
             for ii = 1:length(x)
                 dofi = dof_vec(ii,:);
                 % Loop on the nodes
@@ -46,35 +62,26 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
                    neig_index = find(familyMat(ii,:) == jj);
                    %[fij,history] = T(x(ii,:),x(jj,:),u_n(dofi,n)',u_n(dofj,n)',dt,history(ii,neig_index,:),noFail)
-                   [fij,history(ii,neig_index)] = T(x,u_n(:,n),ii,dof_vec,familyMat,partialAreas,neig_index,dt,history(ii,neig_index),noFail);
+                   [fij,history(ii,neig_index)] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,dt,history(ii,neig_index),noFail);
                    Vj = partialAreas(ii,neig_index);
                    fn(dofi) = fn(dofi) + (fij')*Vj;
                    % Damage index
-                    phi(ii,n) = phi(ii,n) + damageIndex(x,u_n(:,n),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone); % Damage index
+                    phi(ii,n+1) = phi(ii,n+1) + damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone); % Damage index
                    % Strain energy
-                    W(ii,n) = W(ii,n) + strainEnergyDensity(x,u_n(:,n),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,history(ii,neig_index),idb);
+                    W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,history(ii,neig_index),idb);
                end
-               % Kinectic energy
-               energy.KE(ii,n) =  1/2*rho*norm(v_n(dofi,1))^2*V;
                % External work
-               energy.EW(ii,n) = dot(u_n(dofi,n),b(dofi))*V;
+               energy.EW(ii,n+1) = dot(u_n(dofi,n+1),b(dofi))*V;
                % Stored strain energy
-               energy.W(ii,n) = W(ii,n)*V;
-               %phi(ii,n) = damageIndex(x,u_n(:,(2*n-1):(2*n)),family(ii,:),partialAreas(ii,:),ii,crackIn); % Damage index
+               energy.W(ii,n+1) = W(ii,n+1)*V;
+               % Kinectic energy - 
+               %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;
             end
-            % ############ VELOCITY VERLET ALGORITHM ###############
-            % ---- Solving for the dof ----
-            % Step 1 - Midway velocity
-            v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1/2)
-            %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
-            u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1)
-            v_n(1:ndof,1) = v_n(1:ndof,2)+ dt/2*Minv*(fn(1:ndof)*V + bn(1:ndof)*V); % V(n+1) is stored in the next V(n)
-            % ----- Solving for the constraint nodes ----
-            u_const = zeros(length(v_n)-(ndof),1);
-            if ~isempty(u_const)
-                u_const(bc_set(:,3) == 0) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity
-                u_const = u_const + bc_set(:,3)*dt;
-                u_n(ndof+1:end,n+1) = u_n(ndof+1:end,n) + u_const;
+            v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1) is stored in the next V(n)
+            % Kinectic energy
+            for kk = 1:length(x)
+                dofk = dof_vec(kk,:);
+                energy.KE(:,n+1) =  1/2*rho*norm(v_n(dof_vec,1))^2*V;
             end
             % ############ COUNTING THE PROCESSING TIME #############
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")

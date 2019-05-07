@@ -14,14 +14,14 @@ global c1 horizon omega model
                 case "PMB"
                     mu = damageFactor(S_max(neigh_ind),x(ii,:),x(jj,:)); % NoFail not required
                     p = antiderivative(s);
-                    w = c1*influenceFunction(norma,horizon,omega)*norma^2*p*mu/2;
+                    w = c1*influenceFunction(norma,horizon,omega)*norma^2*p*mu;
                 case "Linearized LPS bond-based"
                     extension = dot(eta,xi)/norma;
-                    w = 1/2*c1*influenceFunction(norma,horizon,omega)*extension^2/2;
+                    w = c1*influenceFunction(norma,horizon,omega)*extension^2/2;
                 otherwise
                     break
             end
-            W = W+ w*partialAreas(neigh_ind);
+            W = W+ 1/2*w*partialAreas(neigh_ind);
             neigh_ind = neigh_ind + 1;
     end
 end
@@ -31,10 +31,10 @@ function p = antiderivative(x)
     global S0 S1
     % Evaluate integration constants
     A = [1 0 0 0 0; 0 1 0 0 0; 1 0 0 -1 0; 0 0 1 0 0; 0 0 -1 0 1];
-    b = [S0(1)^2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
+    b = [S0(1)^2/2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
         0;
         S0(1)/(S0(1) - S1(1))*(S1(1)^2/2);
-        S0(2)^2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
+        S0(2)^2/2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
         S0(2)/(S1(2) - S0(2))*S1(2)^2/2];
     C = A\b;
     if x <  S1(1)

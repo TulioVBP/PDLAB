@@ -159,6 +159,7 @@ function damagePlot(x,phi)
 end
 
 function energyPlot(energy,n_final)
+   %energy.W = energy.W/2;
    int = energy.W + energy.KE - energy.EW; % Total energy for each point
    t = 1:1:n_final; % Number of time steps
    figure
