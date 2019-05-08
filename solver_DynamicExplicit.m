@@ -66,7 +66,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    Vj = partialAreas(ii,neig_index);
                    fn(dofi) = fn(dofi) + (fij')*Vj;
                    % Damage index
-                    phi(ii,n+1) = phi(ii,n+1) + damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone); % Damage index
+                    %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
                    % Strain energy
                     W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,history(ii,neig_index),idb);
                end
@@ -76,12 +76,14 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                energy.W(ii,n+1) = W(ii,n+1)*V;
                % Kinectic energy - 
                %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;
+               % Damage index
+               phi(ii,n+1) = damageIndex(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,noFailZone); % Damage index
             end
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1) is stored in the next V(n)
             % Kinectic energy
             for kk = 1:length(x)
                 dofk = dof_vec(kk,:);
-                energy.KE(:,n+1) =  1/2*rho*norm(v_n(dof_vec,1))^2*V;
+                energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2*V;
             end
             % ############ COUNTING THE PROCESSING TIME #############
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")

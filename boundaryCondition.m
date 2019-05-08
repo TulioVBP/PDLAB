@@ -18,7 +18,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
 
     %% DEFINE THE BOUNDARY CONDITIONS
-    if true
+    if false
         % Example of BCs
         b = max(x(:,1));
         rightLay = find(x(:,1) == b);
@@ -32,6 +32,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
         a = max(x(:,2));
         bottomLay = find(x(:,2) == 0);
         topLay = find(x(:,2) == a);
+        bc_set = [];
     end
     %% DEFINE THE IDB VECTOR
     ndof = 2*length(x) - length(bc_set);

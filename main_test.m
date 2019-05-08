@@ -22,7 +22,7 @@ h_vec = horizon./m_vec; % [m]
 omega = 3; % Influence function option
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
-damageOn = false; % True if applying damage to the model, false if not
+damageOn = true; % True if applying damage to the model, false if not
 model.name = "PMB"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
 solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit"
 switch model.name
@@ -73,8 +73,8 @@ for s_index = 1:length(sigma)
         %% -------------- Generate mesh -----------------
         h = h_vec(m_index); % grid spacing [m]
         m = m_vec(m_index); 
-        a = 0.04/2; % height [m]
-        b = 0.10/2; % length [m]
+        a = 0.04; % height [m]
+        b = 0.10; % length [m]
         [x,A] = generateMesh(h,[a b]); % Generates rectangular mesh 
         %% -------------- Boundary conditions ----------------
         [ndof,idb,bc_set,bodyForce,noFailZone] = boundaryCondition(x,stresses,m,h,A);

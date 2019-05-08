@@ -24,10 +24,9 @@ function [f,history] = interactionForce_PMB(x,u,ii,dof_vec,familyMat,partialArea
     % Updating maximum stretch
     if exist('history','var') ~=0
         if S > history
-            S_max = S;
-        else
-            S_max = history;
+            history = S;
         end
+        S_max = history;
     else
         S_max = S;
         history = S;
