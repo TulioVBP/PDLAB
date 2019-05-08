@@ -1,6 +1,7 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
 function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,T,ndof)
+global model
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-6; % According to the roadmap
 N = length(u);
@@ -26,8 +27,13 @@ for ii=1:length(x)
                 dofi = dof_vec(ii,:);
                 %[T_plus,~,~] = T(x(ii,:),x(kk,:),u_plus(dofi)',u_plus(dofk)');
                 neigh_Index = find(family(ii,:)==kk);
-                [T_plus,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index);
-                [T_minus,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index);
+                if model.dilatation
+                    [T_plus,~,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index);
+                    [T_minus,~,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index);
+                else
+                    [T_plus,~,~] = T(x,u_plus,ii,jj,dof_vec);
+                    [T_minus,~,~] = T(x,u_minus,ii,jj,dof_vec);
+                end
                 %[T_minus,~,~] = T(x(ii,:),x(kk,:),u_minus(dofi)',u_minus(dofk)');
                 f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero
                 f_minus = T_minus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero again

@@ -45,17 +45,15 @@ for n = 1:n_tot
         un(:,n+1) = u_trial; % For the next iteration
     else
         % Linear model
-        if n < 2 % If the model is linear, there is no need to find the matrix more than once
-            if ~model.stiffnessAnal 
-                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,T,ndof);
-            else
-                K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,V);
-            end
-        end
+        if ~model.stiffnessAnal 
+            K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,T,ndof);
+        else
+            K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,V);
+        end        
         disp('Stiffness matrix done.')
         bn = bn*V;
         du = -K\bn;
-        disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
+        disp('Solution found.')
         un(:,n) = u_trial + du;
     end    
 end
@@ -78,7 +76,7 @@ for ii = 1:N
         if model.dilatation
             [fij,~,~] = T(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex);
         else
-            [fij,~,~] = T(x,u,ii,jj,dof_vec);
+            [fij,~,~] = T(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex);
         end
         Vj = partialAreas(ii,familyMat(ii,:) == jj);
         f(dofi) = f(dofi) + (fij')*Vj; % N/m^3

@@ -1,21 +1,21 @@
-function [f,history] = interactionForce_LLPSBB(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,dt,history,noFail)
+function [f,history] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
-% x_i: position of node i
-% x_j: position of node j
-% u_i: displacement of node i
-% u_j: displacement of node j
-% S_max_ant: maximum stretch for each given bond
-% notch: coordinates of the initial notch
-% noFail: true if the damage is off for this specific bond
+% x - node position matrix
+% u - degree of freedom displacement vector
+% ii - index of the i-th node
+% jj - index of the j-th node inside i's family
+% dof_vec - matrix with the degrees of freedom corresponding for each node
+% separatorDamage - doesn't do anything but is useful to separate the
+%                   normal variables to the ones needed for damage simulation
+% dt - step time
+% history - maximum stretch for the given bond
+% nofail - boolean variable that takes true if 
 %% OUTPUT
-% f: vector internal force acting on node i due to the j-th node on its
-%    neighbourhood
-% T: vector state force acting on i by j 
-% S_max: maximum stretch for each bond
+% f: vector state force between j and i nodes
+% history: maximum stretch for each bond
 %% CODE
     global c1 horizon omega
-    jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x_j - x_i; % \xi
@@ -25,14 +25,14 @@ function [f,history] = interactionForce_LLPSBB(x,u,ii,dof_vec,familyMat,partialA
     S = dot(eta,xi)/norma^2; % Calculate stretch - linear
     ee = xi/norma; % Versor
     % Updating maximum stretch
-    if exist('S_max_ant','var') ~=0
-        if S > S_max_ant
-            S_max = S;
-        else
-            S_max = S_max_ant;
+    if exist('history','var') ~=0
+        if S > history
+            history = S;
         end
+        S_max = history;
     else
         S_max = S;
+        history = S;
     end
     % Evaluating the force interaction
     if exist('noFail','var') == 0

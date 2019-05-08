@@ -1,18 +1,14 @@
-function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
+function [f,history] = interactionForce_PMB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
 %% INPUT
 % x - node position matrix
 % u - degree of freedom displacement vector
 % ii - index of the i-th node
 % jj - index of the j-th node inside i's family
 % dof_vec - matrix with the degrees of freedom corresponding for each node
-% separatorDamage - doesn't do anything but is useful to separate the
-%                   normal variables to the ones needed for damage simulation
-% dt - step time
-% history - maximum stretch for the given bond
-% nofail - boolean variable that takes true if 
+% separatorDamage - Doe
 %% OUTPUT
 % f: vector state force between j and i nodes
-% history: maximum stretch for each bond
+% S_max: maximum stretch for each bond
 %% CODE
     global c1 horizon omega
     x_i = x(ii,:); x_j = x(jj,:);
