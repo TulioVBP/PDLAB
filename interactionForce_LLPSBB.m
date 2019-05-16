@@ -1,4 +1,4 @@
-function [f,history] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
+function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x - node position matrix
@@ -40,6 +40,7 @@ function [f,history] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDamage
     end
     f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;
     history = 0; % For this specific model
+    mu = 1; % No damage in this model
 end
 
 function ff = fscalar(eta,versor,x)

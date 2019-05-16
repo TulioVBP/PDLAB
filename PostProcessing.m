@@ -1,4 +1,4 @@
-function PostProcessing(x,u,n,idb,phi,energy)
+function PostProcessing(x,u,n,idb,energy,phi)
 % Input: 
 % - x = [x y]: position matrix
 % - family = family matrix
@@ -10,7 +10,6 @@ function PostProcessing(x,u,n,idb,phi,energy)
 %% Making u a 3D matrix
 u = threeDModification(x,u,idb);
 %% Plot the displacement and strain map
-%displacementPlot(x,u(:,(2*n-1):2*n));
 displacementPlot(x,u(:,:,n));
 %strainPlot(x,u(:,(2*n-1):2*n)); % To be perfected
 %% Plot the damage index
@@ -19,7 +18,7 @@ if exist('phi','var')~=0
 end
 %% Plot the total energy
 if exist('energy','var')~=0
-    energyPlot(energy,n);
+    energyPlot(x,energy,n);
 end
 end
 
@@ -119,6 +118,29 @@ function displacementPlot(x,u)
     ylabel y
     zlabel uy
     set(gca,'FontSize',15)
+    %% Plot displacement in the mesh
+    scaleFactor = 1e3;
+    % Mesh
+    figure
+    mesh(X,Y,zeros(size(X)),'LineWidth',1)
+    hold on
+    colormap winter
+    mesh(X+scaleFactor*V,Y+scaleFactor*W,20*ones(size(X)),'LineWidth',1)
+    hidden off
+    xlabel x
+    ylabel y
+    set(gca,'FontSize',15)
+    legend('Reference','Deformed')
+%     % Scatter
+%     figure
+%     scatter(x(:,1),x(:,2),'b','filled')
+%     hold on
+%     scatter(x(:,1)+u(:,1)*scaleFactor,x(:,2)+u(:,2)*scaleFactor,'r','filled')
+%     legend('Reference configuration','Deformed configuration')
+%     xlabel x
+%     ylabel y
+%     set(gca,'FontSize',15)
+%     grid on
 end
 
 function damagePlot(x,phi)
@@ -158,21 +180,53 @@ function damagePlot(x,phi)
     caxis([0 1]);
 end
 
-function energyPlot(energy,n_final)
-   %energy.W = energy.W/2;
+function energyPlot(x,energy,n_final)
+   %% Total energy evolution
    int = energy.W + energy.KE - energy.EW; % Total energy for each point
    t = 1:1:n_final; % Number of time steps
    figure
    plot(t,sum(energy.W(:,1:n_final)),'--','LineWidth',1.5)
    hold on
    plot(t,sum(energy.KE(:,1:n_final)),'-.','LineWidth',1.5)
-   plot(t,sum(energy.EW(:,1:n_final)),'.','LineWidth',1.5)
+   plot(t,sum(energy.EW(:,1:n_final)),'-d','LineWidth',1.5)
    plot(t,sum(int(:,1:n_final)),'-','LineWidth',1.5)
    legend('Strain energy','Kinetic energy','External work','Total internal energy')
    xlabel('Time step n')
    ylabel('Energy (J/m)')
    set(gca,'FontSize',15)
    grid on
+   %% Strain energy density
+    b = max(x(:,1) - min(x(:,1)));
+    a = max(x(:,2) - min(x(:,2)));
+    h = norm(x(1,:) - x(2,:));
+    % Transforming into a matrix array
+    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    WW = zeros(size(X));
+    for jjj = 1:size(X,2)
+        for iii = 1:size(Y,1)
+            %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
+            %reliable
+            coord = [X(1,jjj) Y(iii,1)];
+            for ii = 1:length(x)
+               if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
+                   ind = ii;
+                   break;
+               end
+            end
+            if ~isempty(ind)
+                WW(iii,jjj) = energy.W(ind,n_final);
+            else
+                disp('Error: problem with the matching condition')
+            end
+        end        
+    end
+    figure
+    surf(X,Y,WW)
+    xlabel x
+    ylabel y
+    title('Strain Energy Density')
+    set(gca,'FontSize',15)
+   
 end
 
 function u = threeDModification(x,u_2D,idb)

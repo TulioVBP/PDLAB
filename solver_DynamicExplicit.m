@@ -44,7 +44,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
             u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
              % ----- Solving for the constraint nodes ----
             if ~isempty(u_const)
-                if sum(bc_set(:,3) ~= 0 && bc_set(:,2) ~= 0)
+                if sum(bc_set(:,3) ~= 0 & bc_set(:,2) ~= 0)
                     error('The boundary condition matrix bc_set has prescribed both displacement and velocity for the same node.')
                 end
                 u_const(bc_set(:,3) == 0) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity
@@ -64,9 +64,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    % Loop on their neighbourhood
                    noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
                    if model.dilatation
-                      [fij,history(ii,neig_index),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,dt,history(ii,neig_index),noFail);
+                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,dt,history(ii,neig_index,:),noFail);
                    else
-                      [fij,history(ii,neig_index),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,[ ],dt,history(ii,neig_index),noFail);
+                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,[ ],dt,history(ii,neig_index),noFail);
                    end
                    Vj = partialAreas(ii,neig_index);
                    fn(dofi) = fn(dofi) + (fij')*Vj;
@@ -74,13 +74,24 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    areaTot = areaTot + Vj;
                    partialDamage = partialDamage + mu_j*Vj;
                     %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
+                   if ~model.dilatation
                    % Strain energy
-                    W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,history(ii,neig_index),idb);
+                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,history(ii,neig_index));
+                   % 1/2 factor not truly understood.
+                   end
+                   neig_index = neig_index + 1;
+               end
+               if model.dilatation
+               % Strain energy
+               W(ii,n+1) = 1/2*strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,history(ii,:,:));
                end
                phi(ii,n+1) = 1 - partialDamage/areaTot;
                % External work
                energy.EW(ii,n+1) = dot(u_n(dofi,n+1),b(dofi))*V;
                % Stored strain energy
+               if W(ii,n+1) < 0
+                   a = 1;
+               end
                energy.W(ii,n+1) = W(ii,n+1)*V;
                % Kinectic energy - 
                %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;

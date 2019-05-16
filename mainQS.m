@@ -4,9 +4,9 @@ clc
 close all
 
 %% PARAMETERS
-global alpha c1 c2 horizon omega Sc S0 S1 damageOn rho crackIn model
-% Material
-horizon = 1e-3; % [m]
+global alpha nu c1 c2 horizon omega Sc S0 S1 damageOn rho crackIn model
+% --- Material
+horizon = 5e-3; % [m]
 E = 72e3; % [MPa]
 nu = 1/3;
 rho = 2440; % [kg/m^3]
@@ -22,9 +22,9 @@ omega = 3; % Influence function option
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 % ---- MODEL
-damageOn = true; % True if applying damage to the model, false if not
-model.name = "PMB"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
-solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit"
+damageOn = false; % True if applying damage to the model, false if not
+model.name = "Linearized LPS bond-based"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage"
+solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit"
 switch model.name
     case "PMB"
         alpha = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
@@ -33,9 +33,10 @@ switch model.name
         T = @interactionForce_PMB;
         model.linearity = false;
         model.stiffnessAnal = false;
+        model.dilatation = false;
     case "Linearized LPS"
         nu = 1/4;
-        alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
+        alpha = 1; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
         mm = weightedVolume(horizon,omega); 
         lambda = E*nu/(1+nu)/(1-2*nu); mu = E/2/(1+nu);
         k = mu*(3*lambda + 2*mu)/(lambda + 2*mu);
@@ -44,26 +45,42 @@ switch model.name
         T = @interactionForce_LLPS;
         model.linearity = true;
         model.stiffnessAnal = false; % true if an analytical stiffness matrix for such model is implemented
+        model.dilatation = true;
     case "Linearized LPS bond-based"
-        alpha = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
+        alpha = 1; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
         mm = weightedVolume(horizon,omega); 
         c1 = 6*E*1e6/mm;
         T = @interactionForce_LLPSBB;
         model.linearity = true;
         model.stiffnessAnal = true; % true if an analytical stiffness matrix for such model is implemented
+        model.dilatation = false;
     case "Lipton Free Damage"
+        %nu = 1/4;
         alpha = 1;
         mm = weightedVolume(horizon,omega);
-        c1 = 8*pi*horizon^3/mm*E*1e6/(1+nu);
-        c2 = (2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu));
+        c1 = 8*pi*horizon^3/mm*E*1e6/(1+nu)/2;
+        c2 = (2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu))/2;
         T = @interactionForce_Lipton;
         model.linearity = true;
         model.stiffnessAnal = false;
+        model.dilatation = true;
+    case "LPS 2D"
+        alpha = 1;
+        mm = weightedVolume(horizon,omega);
+        kappa = E*1e6/3/(1-2*nu); mu = E*1e6/2/(1+nu);
+        c1 = kappa + mu/9*(nu+1)^2/(2*nu-1)^2;
+        c2 = 8*mu/mm;
+        T = @interactionForce_StateBased;
+        model.linearity = false;
+        model.stiffnessAnal = false;
+        model.dilatation = true;
     otherwise
         error("Chosen model is not implemented or it was mistyped");
 end
 
 %% SIMULATION
+tic
+t_init = cputime;
 for s_index = 1:length(sigma)
     % STRESS LOOP
     stresses = [0 sigma(s_index) 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
@@ -72,13 +89,13 @@ for s_index = 1:length(sigma)
         %% -------------- Generate mesh -----------------
         h = h_vec(m_index); % grid spacing [m]
         m = m_vec(m_index); 
-        a = 0.04; % height [m]
-        b = 0.10; % length [m]
+        a = 0.04/2; % height [m]
+        b = 0.10/2; % length [m]
         [x,A] = generateMesh(h,[a b]); % Generates rectangular mesh 
         %% -------------- Boundary conditions ----------------
         [ndof,idb,bc_set,bodyForce,noFailZone] = boundaryCondition(x,stresses,m,h,A);
         %% -------------- GENERATE FAMILY ------------------
-        [family,partialAreas,maxNeigh] = generateFamily(x,horizon,m,m_index,true); % True for test
+        [family,partialAreas,maxNeigh] = generateFamily_v2(x,horizon,m,m_index,true,"PA-AC"); % True for test
         %% -------------- Generate history variables ------------------
         history = historyDependency(x,maxNeigh);
         %% -------------- SOLVER -------------------
@@ -89,20 +106,21 @@ for s_index = 1:length(sigma)
                 n_tot = length(t);
                 [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,T,history,noFailZone);
             case "Quasi-Static"
-                n_tot = 1;
-                [u_n,r] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,ndof,A);
+                n_tot = 2;
+                [u_n,r,energy] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,ndof,A);
             otherwise
                 error("Solver not yet implemented.")
                 pause
         end    
     end
 end
-
+toc
+t_run = cputime - t_init;
 %% POST-PROCESSING
 switch solver
     case "Dynamic/Explicit"
-        PostProcessing(x,u_n,n_tot,idb,phi,energy);
+        PostProcessing(x,u_n,n_tot,idb,energy,phi);
     case "Quasi-Static"
-        PostProcessing(x,u_n,n_tot,idb);
+        PostProcessing(x,u_n,n_tot,idb,energy);
     otherwise
 end

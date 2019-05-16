@@ -1,10 +1,13 @@
 %QUASI-STATIC SOLVER
 
-function [un,r] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,T,ndof,V)
+function [un,r,energy] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,T,ndof,V)
 global model
 N = length(idb);
 % Step 1 - Initialization
 un = zeros(N,n_tot); % N= 2*nn
+energy.W = zeros(length(x),n_tot);
+energy.KE = zeros(length(x),n_tot);
+energy.EW = zeros(length(x),n_tot);
 % Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
@@ -53,11 +56,17 @@ for n = 1:n_tot
             end
         end
         disp('Stiffness matrix done.')
-        bn = bn*V;
-        du = -K\bn;
+        %bn = bn*V;
+        du = -K\(bn*V);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial + du;
-    end    
+    end
+    % Energy
+    for ii=1:length(x)
+       dofi = dof_vec(ii,:);
+       energy.W(ii,n) = strainEnergyDensity(x,un(:,n),family(ii,:),partialAreas(ii,:),ii,idb)*V;
+       energy.EW(ii,n) = dot(bn(dofi),un(dofi,n))*V;
+    end
 end
 
 end

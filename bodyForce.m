@@ -43,14 +43,14 @@ end
     % Top layer
     b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
     % Bottom layer
-    b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
+    %b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
     % Left layer
     b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
     % Right layer
     b(rightLay,:) = b(rightLay,:) + [sigmax,tauxy]*h/m./A(rightLay);
     %% Defining no fail zone
     noFailZone = zeros(length(x),1);    
-    noFailZone(topLayer) = true;
-    noFailZone(bottomLayer) = true;
+    %noFailZone(topLayer) = true;
+    %noFailZone(bottomLayer) = true;
     %noFailZone = find(b(:,1)~= 0 | b(:,2)~= 0); % Criterion 1: if a traction force is applied to the node, it is no fail zone
 end

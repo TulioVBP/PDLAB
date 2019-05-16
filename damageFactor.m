@@ -1,6 +1,6 @@
 function mu = damageFactor(x,x_i,x_j,noFail)
 %% Input
-% x: stretch
+% x: stretch, js integral, jtheta integral ...
 % x_i: position of node i
 % x_j: position of node j
 % noFail: true if one of the nodes is in a non fail zone
@@ -8,7 +8,7 @@ function mu = damageFactor(x,x_i,x_j,noFail)
 %% Output
 % mu: damage factor
 %% CODE
-    global damageOn crackIn
+    global damageOn crackIn model
     crackSegments = size(crackIn,1); % At least 2
     check = [];
     if damageOn
@@ -28,11 +28,22 @@ function mu = damageFactor(x,x_i,x_j,noFail)
         end
     else
         % No damage
-        mu = 1;
+        switch model.name
+            case "Lipton Free Damage"
+                mu = [1 1 1];
+            otherwise              
+                mu = 1;
+        end
     end
     if exist('noFail','var')~=0
         if noFail == true
-            mu = 1;
+            % No damage
+            switch model.name
+                case "Lipton Free Damage"
+                    mu = [1 1 1];
+                otherwise              
+                    mu = 1;
+            end
         end
     end
 end
@@ -59,7 +70,9 @@ switch model.name
         xc = 0.15;
         h = @(x) 1 + HH(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + HH(x-xc).*(-exp(1-1./(1-(x/xc).^2.01)));
         % Evaluating Ht or Hd
-        mu = h(x); 
+        mu(1) = h(x(1)); % Ht
+        mu(2) = h(x(2)); % Hd-x
+        mu(3) = h(x(3)); % Hd-y        
     otherwise
         mu = 1;
 end

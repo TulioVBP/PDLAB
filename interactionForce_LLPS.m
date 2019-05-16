@@ -1,4 +1,4 @@
-function [f,history] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,history,dt,noFail)
+function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,history,dt,noFail)
     global c1 c2 horizon omega Sc 
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
@@ -40,4 +40,5 @@ function [f,history] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialAre
     T_ii = c1*influenceFunction(norma,horizon,omega)*theta(1)*xi + c2*influenceFunction(norma,horizon,omega)*ext*ee;
     T_jj = c1*influenceFunction(norma,horizon,omega)*theta(2)*(-xi) + c2*influenceFunction(norma,horizon,omega)*(-ext)*ee;
     f = T_ii - T_jj;
+    mu = 1; % No damage in this model
 end
