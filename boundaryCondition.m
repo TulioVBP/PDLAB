@@ -18,7 +18,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
 
     %% DEFINE THE BOUNDARY CONDITIONS
-    if true
+    if false
         % Example of BCs
         b = max(x(:,1));
         rightLay = find(x(:,1) == b);

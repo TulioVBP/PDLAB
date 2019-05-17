@@ -64,7 +64,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    % Loop on their neighbourhood
                    noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
                    if model.dilatation
-                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,dt,history(ii,neig_index,:),noFail);
+                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,[ ],dt,history(ii,neig_index,:),noFail);
                    else
                       [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,[ ],dt,history(ii,neig_index),noFail);
                    end
@@ -127,4 +127,3 @@ function dt_crit = criticalTimeStep(x,family,partialAreas)
     end
     dt_crit = min(dt); % Critical time step
 end
-

@@ -1,4 +1,5 @@
 function PostProcessing(x,u,n,idb,energy,phi)
+close all
 % Input: 
 % - x = [x y]: position matrix
 % - family = family matrix
@@ -11,7 +12,8 @@ function PostProcessing(x,u,n,idb,energy,phi)
 u = threeDModification(x,u,idb);
 %% Plot the displacement and strain map
 displacementPlot(x,u(:,:,n));
-%strainPlot(x,u(:,(2*n-1):2*n)); % To be perfected
+strainPlot(x,u(:,:,n)); % To be perfected
+%plotClassicalDerivative(x,u(:,:,n))
 %% Plot the damage index
 if exist('phi','var')~=0
     damagePlot(x,phi(:,n));
@@ -60,24 +62,52 @@ function strainPlot(x,u)
             exy(ii) = 1/2/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
         else
             % Bulk nodes (or left/bottom nodes)
-            exx(ii) = (v(ii+1) - v(ii))/h; % dv/dx
-            eyy(ii) = (w(ii+N) - w(ii))/h; % dw/dy
-            exy(ii) = 1/2/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
+            exx(ii) = (v(ii+1) - v(ii))/2*h; % dv/dx
+            eyy(ii) = (w(ii+N) - w(ii))/2*h; % dw/dy
+            exy(ii) = 1/4/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
         end        
     end
-    % Plot
+    %% Transforming into matrix
+    b = max(x(:,1) - min(x(:,1)));
+    a = max(x(:,2) - min(x(:,2)));
+    h = norm(x(1,:) - x(2,:));
+    % Transforming into a matrix array
+    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    EXX = zeros(size(X)); EYY = zeros(size(Y)); EXY = zeros(size(X));
+    for jjj = 1:size(X,2)
+        for iii = 1:size(Y,1)
+            %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
+            %reliable
+            coord = [X(1,jjj) Y(iii,1)];
+            for ii = 1:length(x)
+               if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
+                   ind = ii;
+                   break;
+               end
+            end
+            if ~isempty(ind)
+                EXX(iii,jjj) = exx(ind);
+                EYY(iii,jjj) = eyy(ind);
+                EXY(iii,jjj) = exy(ind);
+            else
+                disp('Error: problem with the matching condition')
+            end
+        end        
+    end
+    %% Plot
     figure
-    plot3(x(:,1),x(:,2),exx,'.')
+    surf(X,Y,EXX)
     xlabel x
     ylabel y
-    zlabel exx
+    zlabel \epsilon_x
     
     figure
-    plot3(x(:,1),x(:,2),eyy,'.')
+    surf(X,Y,EYY)
     xlabel x
     ylabel y
-    zlabel eyy
+    zlabel \epsilon_y
 end
+
 
 function displacementPlot(x,u)
     b = max(x(:,1) - min(x(:,1)));

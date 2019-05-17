@@ -43,7 +43,7 @@ end
     % Top layer
     b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
     % Bottom layer
-    %b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
+    b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
     % Left layer
     b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
     % Right layer

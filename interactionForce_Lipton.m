@@ -1,4 +1,4 @@
-function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,dt,history,noFail)
+function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,separatorDamage,dt,history,noFail)
 %% INPUT
 % x_i: position of node i
 % x_j: position of node j
@@ -76,7 +76,7 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
     fd = 1/V_delta*influenceFunction(norma,horizon,omega)/horizon^2*norma*(Hd_y*gscalar(theta_j) + Hd_x*gscalar(theta_i))*ee;
     % Final force
     f = fd + ft;
-    mu = 1; % Check for damage in this model
+    mu = Ht; % Check for damage in this model
 end
 
 function ff = fscalar(x,norma)

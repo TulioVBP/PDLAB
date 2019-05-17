@@ -24,7 +24,12 @@ function mu = damageFactor(x,x_i,x_j,noFail)
             mu = mu_model(x);
         else
             % Bond interceptate the initial crack (notch)
-          mu = 0;
+           switch model.name
+           case "Lipton Free Damage"
+                mu = [0 0 0];
+           otherwise              
+                mu = 0;
+            end
         end
     else
         % No damage
