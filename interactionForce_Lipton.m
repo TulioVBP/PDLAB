@@ -1,19 +1,28 @@
-function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,separatorDamage,dt,history,noFail)
+function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,separatorDamage,dt,history,noFail)
 %% INPUT
-% x_i: position of node i
-% x_j: position of node j
-% u_i: displacement of node i
-% u_j: displacement of node j
-% dt: time step
-% S_max_ant: maximum stretch for each given bond
-% notch: coordinates of the initial notch
-% noFail: true if the damage is off for this specific bond
+% x: nodes position
+% u: dof's displacement
+% ii: i-th node index
+% dof_vec: index of k-th(k is the row index) dof's
+% familyMat: family interaction matrix
+% partialAreas: partial areas 
+% neighIndex: index of the j-th node
+% par_omega: parameters for the omega
+% c: material's constants
+% separatorDamage: doesn't have a role but it helps differentiate between
+%                  what is damage related and what is not
+% dt: step time 
+% history: depending on the model, is an arbitrary history dependent
+%          variable
+% noFail: true if the either of the nodes jj and ii is a no-fail zone
+
 %% OUTPUT
 % f: vector internal force between j and i nodes
-% S_max: maximum stretch for each bond
+% history_up: updated history dependent variable
 % T: vector state force
 %% CODE
-    global horizon omega Sc
+    global  Sc
+    horizon = par_omega(1);
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
@@ -49,7 +58,7 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
         u_k = u(dofk)';
         eta_2 = u_k - u_i;
         S_z = dot(zeta,eta_2)/norm(zeta)^2;
-        theta_i = theta_i + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z*partialAreas(ii,neighIndex2);
+        theta_i = theta_i + 1/V_delta*influenceFunction(norm(zeta),par_omega)*norm(zeta)^2*S_z*partialAreas(ii,neighIndex2);
         neighIndex2 = neighIndex2  + 1;
     end
     theta_j = 0;
@@ -60,7 +69,7 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
         u_k = u(dofk)';
         eta_2 = u_k - u_j;
         S_z = dot(zeta,eta_2)/norm(zeta)^2;
-        theta_j = theta_j + 1/V_delta*influenceFunction(norm(zeta),horizon,omega)*norm(zeta)^2*S_z*partialAreas(jj,neighIndex2);
+        theta_j = theta_j + 1/V_delta*influenceFunction(norm(zeta),par_omega)*norm(zeta)^2*S_z*partialAreas(jj,neighIndex2);
         neighIndex2 = neighIndex2  + 1;
     end
     thetac_p = 0.01;
@@ -71,41 +80,41 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
     H = damageFactor(history_up,x_i,x_j,noFail);
     Ht = H(1); Hd_x = H(2); Hd_y = H(3);
     % Tensile term Lt
-    ft = 2/V_delta*influenceFunction(norma,horizon,omega)/horizon*Ht*fscalar(sqrt(norma)*S,norma)*ee;
+    ft = 2/V_delta*influenceFunction(norma,par_omega)/horizon*Ht*fscalar(sqrt(norma)*S,norma,c)*ee;
     % Dilatation term Ld
-    fd = 1/V_delta*influenceFunction(norma,horizon,omega)/horizon^2*norma*(Hd_y*gscalar(theta_j) + Hd_x*gscalar(theta_i))*ee;
+    fd = 1/V_delta*influenceFunction(norma,par_omega)/horizon^2*norma*(Hd_y*gscalar(theta_j,c) + Hd_x*gscalar(theta_i,c))*ee;
     % Final force
     f = fd + ft;
     mu = Ht; % Check for damage in this model
 end
 
-function ff = fscalar(x,norma)
-global damageOn c1
+function ff = fscalar(x,norma,c)
+global damageOn
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
     if x <= r1
-        ff = c1*x*sqrt(norma);
+        ff = c(1)*x*sqrt(norma);
     elseif x > r2
         ff = norma;
     end
 else
-    ff = c1*x*sqrt(norma);
+    ff = c(1)*x*sqrt(norma);
 end
 end
 
-function gg = gscalar(x)
-global damageOn c2
+function gg = gscalar(x,c)
+global damageOn
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
     if x <= r1
-        gg = c2*x;
+        gg = c(2)*x;
     elseif x > r2
         gg = 1;
     end
 else
-    gg = c2*x;
+    gg = c(2)*x;
 end
 
 end

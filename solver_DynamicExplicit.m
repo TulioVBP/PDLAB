@@ -1,6 +1,6 @@
 % Explicit time - dynamic solver
 
-function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,partialAreas,T,history,noFailZone)
+function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,partialAreas,T,c,par_omega,history,noFailZone)
     global rho model
     ndof = 2*length(x) - length(bc_set);
     %% Create volume
@@ -8,7 +8,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
     V = h^2; % homogeneous volume
     %% Verify if dt is small enough
     dt = abs(t(2) - t(1));
-    dt_crit = criticalTimeStep(x,familyMat,partialAreas);
+    dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c);
     dt_ratio = dt/dt_crit;
     if dt_ratio < 1
         disp("Given time-step " + num2str(dt) +" sec is less than the critical time-step, " + num2str(dt_crit) + ...
@@ -64,9 +64,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    % Loop on their neighbourhood
                    noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
                    if model.dilatation
-                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,[ ],dt,history(ii,neig_index,:),noFail);
+                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,[ ],dt,history(ii,neig_index,:),noFail);
                    else
-                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,[ ],dt,history(ii,neig_index),noFail);
+                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,par_omega,c,[ ],dt,history(ii,neig_index),noFail);
                    end
                    Vj = partialAreas(ii,neig_index);
                    fn(dofi) = fn(dofi) + (fij')*Vj;
@@ -76,14 +76,14 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                     %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
                    if ~model.dilatation
                    % Strain energy
-                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,history(ii,neig_index));
+                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,par_omega,c,history(ii,neig_index));
                    % 1/2 factor not truly understood.
                    end
                    neig_index = neig_index + 1;
                end
                if model.dilatation
                % Strain energy
-               W(ii,n+1) = 1/2*strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,history(ii,:,:));
+               W(ii,n+1) = 1/2*strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,par_omega,c,history(ii,:,:));
                end
                phi(ii,n+1) = 1 - partialDamage/areaTot;
                % External work
@@ -109,8 +109,8 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
         end
 end
 
-function dt_crit = criticalTimeStep(x,family,partialAreas)
-    global rho c1 omega horizon
+function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c)
+    global rho
     dt = zeros(length(x),1);
     for ii = 1:length(x)
         familyOfI = family(ii,family(ii,:)~=0);
@@ -119,7 +119,7 @@ function dt_crit = criticalTimeStep(x,family,partialAreas)
             neigh_index = family(ii,:) == jj;
             xi = x(jj,:) - x(ii,:);
             norma = norm(xi);
-            C = c1*influenceFunction(norma,horizon,omega)*norma/norma^3*...
+            C = c(1)*influenceFunction(norma,par_omega)*norma/norma^3*...
             [xi(1)^2 xi(1)*xi(2); xi(1)*xi(2) xi(2)^2]; % PMB model only
             den = den + norm(C)*partialAreas(neigh_index);
         end

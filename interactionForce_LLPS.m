@@ -1,5 +1,4 @@
-function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,history,dt,noFail)
-    global c1 c2 horizon omega Sc 
+function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,par_omega,c,separatorDamage,dt,history,noFail) 
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
@@ -22,7 +21,7 @@ function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partial
     % ---- Evaluatin the force ----
     % Dilatation term
     theta = [0 0];
-    m = weightedVolume(horizon,omega);
+    m = weightedVolume(par_omega);
     for bond = [ii jj]
         dofb = dof_vec(bond,:);
         u_b = u(dofb)';
@@ -33,12 +32,12 @@ function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partial
             u_k = u(dofk)';
             eta_2 = u_k - u_b;
             S_z = dot(zeta,eta_2)/norm(zeta)^2;
-            theta(bond == ii + 2*bond == jj)= 2/m*influenceFunction(norm(zeta),horizon,omega)*S_z*norm(zeta)^2*partialArea(bond,neighInd2) +  theta(bond == ii + 2*bond == jj); % The boolean operator returns 1 if equal to ii and 2 if equal to jj
+            theta(bond == ii + 2*bond == jj)= 2/m*influenceFunction(norm(zeta),par_omega)*S_z*norm(zeta)^2*partialArea(bond,neighInd2) +  theta(bond == ii + 2*bond == jj); % The boolean operator returns 1 if equal to ii and 2 if equal to jj
             neighInd2 = neighInd2 + 1;
         end
     end
-    T_ii = c1*influenceFunction(norma,horizon,omega)*theta(1)*xi + c2*influenceFunction(norma,horizon,omega)*ext*ee;
-    T_jj = c1*influenceFunction(norma,horizon,omega)*theta(2)*(-xi) + c2*influenceFunction(norma,horizon,omega)*(-ext)*ee;
+    T_ii = c(1)*influenceFunction(norma,par_omega)*theta(1)*xi + c(2)*influenceFunction(norma,par_omega)*ext*ee;
+    T_jj = c(1)*influenceFunction(norma,par_omega)*theta(2)*(-xi) + c(2)*influenceFunction(norma,par_omega)*(-ext)*ee;
     f = T_ii - T_jj;
     mu = 1; % No damage in this model
 end

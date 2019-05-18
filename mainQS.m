@@ -4,9 +4,9 @@ clc
 close all
 
 %% PARAMETERS
-global alpha nu c1 c2 horizon omega Sc S0 S1 damageOn rho crackIn model
+global c1 c2 nu Sc S0 S1 damageOn rho crackIn model
 % --- Material
-horizon = 5e-3; % [m]
+horizon = 1e-3; % [m]
 E = 72e3; % [MPa]
 nu = 1/3;
 rho = 2440; % [kg/m^3]
@@ -18,7 +18,8 @@ S1 = [-0.99 1.05*Sc]; % S1- and S1+
 sigma = 4; % [MPa]
 m_vec = [2 4]; %[2 3 6 9]; % horizon number (last one should be 12 but we don't have enough space in memory) m = [2 3 6 12]
 h_vec = horizon./m_vec; % [m]
-omega = 3; % Influence function option
+omega = 3; alfa = 1;% Influence function options
+par_omega = [horizon omega alfa];
 notch_length = 0.05; % 5 cm
 crackIn = [0 0.02; notch_length 0.02]; % Coordinates of the crack initial segment
 % ---- MODEL
@@ -104,10 +105,10 @@ for s_index = 1:length(sigma)
                 dt = 0.02e-6; % 0.02 micro-sec is the one used by the paper
                 t = 0:dt:40e-6; % 40 micro-secs simulation
                 n_tot = length(t);
-                [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,T,history,noFailZone);
+                [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,T,par_omega,history,noFailZone);
             case "Quasi-Static"
                 n_tot = 2;
-                [u_n,r,energy] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,ndof,A);
+                [u_n,r,energy] = solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,T,par_omega,ndof,A);
             otherwise
                 error("Solver not yet implemented.")
                 pause

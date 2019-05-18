@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDamage,dt,history,noFail)
+function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,par_omega,c,separatorDamage,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x - node position matrix
@@ -15,7 +15,6 @@ function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDam
 % f: vector state force between j and i nodes
 % history: maximum stretch for each bond
 %% CODE
-    global c1 horizon omega
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x_j - x_i; % \xi
@@ -38,7 +37,7 @@ function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,separatorDam
     if exist('noFail','var') == 0
         noFail = 1;
     end
-    f = c1*influenceFunction(norma,horizon,omega)*fscalar(eta,ee,S)*noFail*ee;
+    f = c(1)*influenceFunction(norma,par_omega)*fscalar(eta,ee,S)*ee;
     history = 0; % For this specific model
     mu = 1; % No damage in this model
 end

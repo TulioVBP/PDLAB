@@ -1,5 +1,5 @@
 function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,history)
-global model
+global c1 c2 model
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
@@ -7,7 +7,7 @@ global model
     horizon = par_omega(1);
     % Evaluate dilatation
     if model.dilatation
-        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c);
+        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega);
     end
     neigh_ind = 1;
     for jj = familySet
@@ -24,15 +24,15 @@ global model
                         mu = 1;
                     end
                     p = antiderivative(s);
-                    w = 1/2*c(1)*influenceFunction(norma,par_omega)*norma^2*p*mu;
+                    w = 1/2*c1*influenceFunction(norma,par_omega)*norma^2*p*mu;
                     W = W + w*partialAreas(neigh_ind);
                 case "Linearized LPS bond-based"
                     extension = dot(eta,xi)/norma;
-                    w = 1/2*c(1)*influenceFunction(norma,par_omega)*extension^2/2;
+                    w = 1/2*c1*influenceFunction(norma,par_omega)*extension^2/2;
                     W = W + w*partialAreas(neigh_ind);
                 case "Linearized LPS"
-                    kappa = c(1)*m/2+c(2)*m/3;
-                    alfa = c(2);
+                    kappa = c1*m/2+c2*m/3;
+                    alfa = c2;
                     w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
                     W = W + w*partialAreas(neigh_ind);
                     if jj == familySet(end)
@@ -46,15 +46,15 @@ global model
                     end
                     Slin = dot(xi,eta)/norma^2;
                     V_delta = pi*horizon^2;
-                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c))*partialAreas(neigh_ind);
+                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma)))*partialAreas(neigh_ind);
                     if jj == familySet(end)
-                        W = W + 1/horizon^2*H(2)*g_potential(theta_i,c);
+                        W = W + 1/horizon^2*H(2)*g_potential(theta_i);
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);
-                    W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind);
+                    W =  W + c2/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind);
                     if jj == familySet(end)
-                        W = W + c(1)*theta_i^2/2;
+                        W = W + c1*theta_i^2/2;
                         W = W*2; % Teste
                     end
                 otherwise
@@ -88,8 +88,8 @@ function p = antiderivative(x)
     end
 end
 
-function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c)
-    global model
+function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega)
+    global nu model
     horizon = par_omega(1);
     familySet = family(family~=0);
     neigh_ind = 1;
@@ -108,7 +108,6 @@ function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c)
                 S_linear = dot(xi,eta)/norma^2;
                 theta = theta + 1/V_delta*influenceFunction(norma,par_omega)*norma^2*S_linear*partialAreas(neigh_ind);                
             case "LPS 2D"
-                nu = c(3);
                 elong = norm(xi+eta) - norm(xi);
                 theta = theta + 2*(2*nu-1)/(nu-1)/m*influenceFunction(norma,par_omega)*norma*elong*partialAreas(neigh_ind);
             otherwise
@@ -118,33 +117,33 @@ function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c)
     end
 end
 
-function ff = f_potential(x,c)
-global damageOn
+function ff = f_potential(x)
+global damageOn c1
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
     if x <= r1
-        ff = c(1)*x^2/2;
+        ff = c1*x^2/2;
     elseif x > r2
         ff = x;
     end
 else
-    ff = c(1)*x^2/2;
+    ff = c1*x^2/2;
 end
 end
 
-function gg = g_potential(x,c)
-global damageOn
+function gg = g_potential(x)
+global damageOn c2
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
     if x <= r1
-        gg = c(2)*x^2/2;
+        gg = c2*x^2/2;
     elseif x > r2
         gg = x;
     end
 else
-    gg = c(2)*x^2/2;
+    gg = c2*x^2/2;
 end
 
 end

@@ -1,4 +1,4 @@
-function m_anl = weightedVolume(horizon,option)
+function m_anl = weightedVolume(parameters)
 %% Analytical 'm': m is equal inside all the domain, as if it was on the bulk
 % NBL MODEL
 % INPUT : 
@@ -8,13 +8,15 @@ function m_anl = weightedVolume(horizon,option)
 % familyInfo - familyInfo(i,j) indicates whether the node is on the
 %              boundary or not
 % V  - V(i) represents the element volume of each node (i)
-% horizon - Peridynamic horizon
-% option - defines which influence function is used
+% parameters = [horizon option alfa]
 % ------
 % OUTPUT : 
 % m_anl - Weighted Volume
 % ------
-global alpha
+%global alfa
+horizon = parameters(1); 
+option = parameters(2); 
+alfa = parameters(3);
     %N = size(x,1); % Number of nodes
     %m = ones(N,1); % Initializing the "m" vector
     switch option
@@ -23,35 +25,35 @@ global alpha
             m_anl = l^2 * pi *(l^2 - exp(-(horizon^2/l^2))*(l^2 + horizon^2));
         case 2
             %P0
-            if alpha == 0
+            if alfa == 0
                  m_anl = pi*horizon^4/2;
-            elseif alpha == 1
+            elseif alfa == 1
                  m_anl = 2*pi*horizon^3/3;
             end
         case 3
             % P1
-            if alpha == 0
+            if alfa == 0
                  m_anl = pi*horizon^4/10;
-            elseif alpha == 1
+            elseif alfa == 1
                  m_anl = pi*horizon^3/6;
             end
         case 4
             % P3
-            if alpha == 0
+            if alfa == 0
                  m_anl = pi*horizon^4/14;
-            elseif alpha == 1
+            elseif alfa == 1
                  m_anl = 2*pi*horizon^3/15;
             end
         case 5
-            if alpha == 0
+            if alfa == 0
                  m_anl = 5*pi*horizon^4/84;
-            elseif alpha == 1
+            elseif alfa == 1
                  m_anl = 5*pi*horizon^3/42;
             end
         case 6
-            if alpha == 0
+            if alfa == 0
                  m_anl = 7*pi*horizon^4/132;
-            elseif alpha == 1
+            elseif alfa == 1
                  m_anl = pi*horizon^3/9;
             end
     end

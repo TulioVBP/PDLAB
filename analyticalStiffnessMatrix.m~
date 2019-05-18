@@ -10,18 +10,17 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,V,par_
 % - partialArea: partial areas of node in j collumn to the ith node
 % - V: scalar volume for each node
 % - par_omega: horizon omega alfa
-% - c: material's constant
 %% OUTPUT:
 % ------------------------------------------------------------
 % - A: PD static matrix
-global model
+global c1 model
     penalty = 1e10;
     N = size(x,1);
     A = zeros(2*N,2*N); % 2N GDLs
     m = weightedVolume(par_omega)*ones(length(x),1);
     switch model.name
         case "Linearized LPS bond-based"
-            c = c(1)/2*weightedVolume(par_omega);
+            c = c1/2*weightedVolume(par_omega);
             for ii = 1:N
                 %node_i = ceil(ii/2); % Finding the node related to the
                 dofi = [idb(2*ii-1) idb(2*ii)];
