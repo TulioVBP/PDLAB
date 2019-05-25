@@ -1,14 +1,13 @@
 % Explicit time - dynamic solver
 
-function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,partialAreas,T,c,par_omega,history,noFailZone)
-    global rho model
+function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,partialAreas,T,c,rho,model,par_omega,history,noFailZone,damage)
     ndof = 2*length(x) - length(bc_set);
     %% Create volume
     h = norm(x(1,:)-x(2,:));
     V = h^2; % homogeneous volume
     %% Verify if dt is small enough
     dt = abs(t(2) - t(1));
-    dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c);
+    dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c,rho,model);
     dt_ratio = dt/dt_crit;
     if dt_ratio < 1
         disp("Given time-step " + num2str(dt) +" sec is less than the critical time-step, " + num2str(dt_crit) + ...
@@ -22,7 +21,8 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
-    %% INITIALIZE SIMULATION MATRICES       
+    %% INITIALIZE SIMULATION MATRICES 
+        %parpool(2)
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
         W = zeros(length(x),length(t)); % No initial deformation
@@ -35,6 +35,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
         energy.EW = zeros(length(x),length(t));
         fn = zeros(2*length(x),1); % Initial force
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
+        history_up = history;
         for n = 1:length(t)-1
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
@@ -64,9 +65,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                    % Loop on their neighbourhood
                    noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
                    if model.dilatation
-                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,[ ],dt,history(ii,neig_index,:),noFail);
+                      [fij,history_up(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history(ii,neig_index,:),noFail);
                    else
-                      [fij,history(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,par_omega,c,[ ],dt,history(ii,neig_index),noFail);
+                      [fij,history_up(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history(ii,neig_index),noFail);
                    end
                    Vj = partialAreas(ii,neig_index);
                    fn(dofi) = fn(dofi) + (fij')*Vj;
@@ -76,22 +77,19 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                     %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
                    if ~model.dilatation
                    % Strain energy
-                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,par_omega,c,history(ii,neig_index));
+                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,par_omega,c,model,damage,history(ii,neig_index));
                    % 1/2 factor not truly understood.
                    end
                    neig_index = neig_index + 1;
                end
                if model.dilatation
                % Strain energy
-               W(ii,n+1) = 1/2*strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,par_omega,c,history(ii,:,:));
+               W(ii,n+1) = strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,par_omega,c,model,damage,history(ii,:,:));
                end
                phi(ii,n+1) = 1 - partialDamage/areaTot;
                % External work
                energy.EW(ii,n+1) = dot(u_n(dofi,n+1),b(dofi))*V;
                % Stored strain energy
-               if W(ii,n+1) < 0
-                   a = 1;
-               end
                energy.W(ii,n+1) = W(ii,n+1)*V;
                % Kinectic energy - 
                %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;
@@ -103,14 +101,15 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                 dofk = dof_vec(kk,:);
                 energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2*V;
             end
+            % Update history matrix;
+            history = history_up;
             % ############ COUNTING THE PROCESSING TIME #############
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")
             %pause
         end
 end
 
-function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c)
-    global rho
+function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt = zeros(length(x),1);
     for ii = 1:length(x)
         familyOfI = family(ii,family(ii,:)~=0);

@@ -1,5 +1,5 @@
 % Function to generate the stiffness matrix for the quasi-static solver
-function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,V,par_omega,c)
+function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,V,par_omega,c,model,damage)
 %% INPUT:
 % ------------------------------------------------------------
 % - x: position of the nodes
@@ -14,7 +14,6 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialArea,V,par_
 %% OUTPUT:
 % ------------------------------------------------------------
 % - A: PD static matrix
-global model
     penalty = 1e10;
     N = size(x,1);
     A = zeros(2*N,2*N); % 2N GDLs

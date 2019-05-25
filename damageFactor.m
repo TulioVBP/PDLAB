@@ -1,27 +1,24 @@
-function mu = damageFactor(x,x_i,x_j,noFail)
+function mu = damageFactor(x,x_i,x_j,damage,noFail,model)
 %% Input
 % x: stretch, js integral, jtheta integral ...
 % x_i: position of node i
 % x_j: position of node j
+% damage: all needed data
 % noFail: true if one of the nodes is in a non fail zone
 % dt: timestep (not always needed)
 %% Output
 % mu: damage factor
 %% CODE
-    global damageOn crackIn model
-    crackSegments = size(crackIn,1); % At least 2
+    crackSegments = size(damage.crackIn,1); % At least 2
     check = [];
-    if damageOn
+    if damage.damageOn
         % With damage
         for ii = 1:crackSegments-1
-            [~,check(ii)] = checkBondCrack(x_i,x_j,crackIn(ii,:),crackIn(ii+1,:));
+            [~,check(ii)] = checkBondCrack(x_i,x_j,damage.crackIn(ii,:),damage.crackIn(ii+1,:));
         end
         if ~sum(check)
             % Bond doesn't interceptate the initial crack (notch)
-            if exist('dt','var')~=1
-                dt = 0;
-            end
-            mu = mu_model(x);
+            mu = mu_model(x,damage,model);
         else
             % Bond interceptate the initial crack (notch)
            switch model.name
@@ -53,10 +50,11 @@ function mu = damageFactor(x,x_i,x_j,noFail)
     end
 end
 
-function mu = mu_model(x)
+function mu = mu_model(x,damage,model)
 % INPUT
 % x - Stretch
-global model S0 S1
+S0 = damage.S0;
+S1 = damage.S1;
 
 switch model.name
     case "PMB"
@@ -71,15 +69,21 @@ switch model.name
     case "Lipton Free Damage"
         %% Ht
         % Evaluating h
-        HH = @(x) (x >= 0); % Heaviside function
         xc = 0.15;
-        h = @(x) 1 + HH(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + HH(x-xc).*(-exp(1-1./(1-(x/xc).^2.01)));
         % Evaluating Ht or Hd
-        mu(1) = h(x(1)); % Ht
-        mu(2) = h(x(2)); % Hd-x
-        mu(3) = h(x(3)); % Hd-y        
+        mu(1) = h_function(x(1),xc); % Ht
+        mu(2) = h_function(x(2),xc); % Hd-x
+        mu(3) = h_function(x(3),xc); % Hd-y        
     otherwise
         mu = 1;
 end
 
+end
+
+function h = h_function(x,xc)
+    h = 1 + heaviside_v2(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + heaviside_v2(x-xc).*(-exp(1-1./(1-(x/xc).^2.01)));
+end
+
+function HH = heaviside_v2(x)
+    HH = x >= 0; % Heaviside function
 end

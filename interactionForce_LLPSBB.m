@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,par_omega,c,separatorDamage,dt,history,noFail)
+function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% Function to evaluate the linearized LPS bond-based force between two interacting nodes
 %% INPUT
 % x - node position matrix
@@ -37,18 +37,21 @@ function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,par_omega,c,
     if exist('noFail','var') == 0
         noFail = 1;
     end
-    f = c(1)*influenceFunction(norma,par_omega)*fscalar(eta,ee,S)*ee;
+    if ~exist('damage','var')
+        damage.damageOn = false;
+        damage.crackIn = [];
+    end
+    f = c(1)*influenceFunction(norma,par_omega)*fscalar(eta,ee,S,damage)*ee;
     history = 0; % For this specific model
     mu = 1; % No damage in this model
 end
 
-function ff = fscalar(eta,versor,x)
+function ff = fscalar(eta,versor,x,damage)
 % eta: uj - ui
 % versor: direction of the force
 % x: stretch
-global S0 S1 damageOn
-if damageOn
-     if x < S0(2)
+if damage.damageOn
+     if x < damage.S0(2)
         ff = dot(eta,versor);
      else
         ff = 0;

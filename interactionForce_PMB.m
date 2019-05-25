@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,separatorDamage,dt,history,noFail)
+function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% INPUT
 % x - node position matrix
 % u - degree of freedom displacement vector
@@ -37,13 +37,14 @@ function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,sep
         noFail = 0;
     end
     % Evaluating the force interaction
-    mu = damageFactor(S_max,x_i,x_j,noFail); % If noFail is true then we will always have mu as one
-    f = c(1)*influenceFunction(norma,par_omega)*norma*fscalar(S*mu)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
+    mu = damageFactor(S_max,x_i,x_j,damage,noFail,model); % If noFail is true then we will always have mu as one
+    f = c(1)*influenceFunction(norma,par_omega)*norma*fscalar(S*mu,damage)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
 end
 
-function ff = fscalar(x)
-global S0 S1 damageOn
-if damageOn
+function ff = fscalar(x,damage)
+%global S0 S1 damageOn
+if damage.damageOn
+    S0 = damage.S0; S1 = damage.S1;
     if x > S1(1) && x < S0(1) % (S1-,S0-)
       ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
     elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]

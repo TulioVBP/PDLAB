@@ -1,4 +1,4 @@
-function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,separatorDamage,dt,history,noFail)
+function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% INPUT
 % x: nodes position
 % u: dof's displacement
@@ -21,7 +21,6 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
 % history_up: updated history dependent variable
 % T: vector state force
 %% CODE
-    global  Sc
     horizon = par_omega(1);
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
@@ -46,8 +45,8 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
     V_delta = pi*horizon^2; % Not sure if this is the right expression
     % ---- Evaluating the damage factor Ht
     % . Evaluating js
-    js = @(x) (x >= Sc).*(x/Sc-1).^5./(1+(x/Sc).^5); % If x < Sc, then js = 0;
-    history_up(1) = history(1) + js(S)*dt;
+    %js = @(x) (x >= Sc).*(x/Sc-1).^5./(1+(x/Sc).^5); % If x < Sc, then js = 0;
+    history_up(1) = history(1) + js(S,damage.Sc)*dt;
     % -- Evaluating the dilatation
     % Dilatation term
     theta_i = 0;
@@ -74,22 +73,21 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
     end
     thetac_p = 0.01;
     thetac_m = 0.01;
-    jth = @(x) (x >= thetac_p).*(x/thetac_p-1).^4./(1+(x/thetac_p).^5) + (x <= -thetac_m).*(-x/thetac_m-1).^4./(1+(-x/thetac_m).^5); % If x < Sc, then js = 0;
-    history_up(2) = history(2) + jth(theta_i)*dt; % Update integral of dilatation of x_i for this specific interaction
-    history_up(3) = history(3) + jth(theta_j)*dt; % Update integral of dilatation of x_j for this specific interaction
-    H = damageFactor(history_up,x_i,x_j,noFail);
+    %jth = @(x) (x >= thetac_p).*(x/thetac_p-1).^4./(1+(x/thetac_p).^5) + (x <= -thetac_m).*(-x/thetac_m-1).^4./(1+(-x/thetac_m).^5); % If x < Sc, then js = 0;
+    history_up(2) = history(2) + jth(theta_i,thetac_p,thetac_m)*dt; % Update integral of dilatation of x_i for this specific interaction
+    history_up(3) = history(3) + jth(theta_j,thetac_p,thetac_m)*dt; % Update integral of dilatation of x_j for this specific interaction
+    H = damageFactor(history_up,x_i,x_j,damage,noFail,model);
     Ht = H(1); Hd_x = H(2); Hd_y = H(3);
     % Tensile term Lt
-    ft = 2/V_delta*influenceFunction(norma,par_omega)/horizon*Ht*fscalar(sqrt(norma)*S,norma,c)*ee;
+    ft = 2/V_delta*influenceFunction(norma,par_omega)/horizon*Ht*fscalar(sqrt(norma)*S,norma,c,damage.damageOn)*ee;
     % Dilatation term Ld
-    fd = 1/V_delta*influenceFunction(norma,par_omega)/horizon^2*norma*(Hd_y*gscalar(theta_j,c) + Hd_x*gscalar(theta_i,c))*ee;
+    fd = 1/V_delta*influenceFunction(norma,par_omega)/horizon^2*norma*(Hd_y*gscalar(theta_j,c,damage.damageOn) + Hd_x*gscalar(theta_i,c,damage.damageOn))*ee;
     % Final force
     f = fd + ft;
     mu = Ht; % Check for damage in this model
 end
 
-function ff = fscalar(x,norma,c)
-global damageOn
+function ff = fscalar(x,norma,c,damageOn)
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
@@ -103,8 +101,7 @@ else
 end
 end
 
-function gg = gscalar(x,c)
-global damageOn
+function gg = gscalar(x,c,damageOn)
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
@@ -117,4 +114,12 @@ else
     gg = c(2)*x;
 end
 
+end
+
+function jj = js(x,Sc)
+    jj = (x >= Sc).*(x/Sc-1).^5./(1+(x/Sc).^5); % If x < Sc, then js = 0;
+end
+
+function jj = jth(x,thetac_p,thetac_m)
+    jj = (x >= thetac_p).*(x/thetac_p-1).^4./(1+(x/thetac_p).^5) + (x <= -thetac_m).*(-x/thetac_m-1).^4./(1+(-x/thetac_m).^5); % If x < Sc, then js = 0;
 end

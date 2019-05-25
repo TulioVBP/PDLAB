@@ -1,5 +1,4 @@
-function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,history)
-global model
+function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,model,damage,history)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
@@ -7,7 +6,7 @@ global model
     horizon = par_omega(1);
     % Evaluate dilatation
     if model.dilatation
-        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c);
+        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);
     end
     neigh_ind = 1;
     for jj = familySet
@@ -19,11 +18,11 @@ global model
             switch model.name
                 case "PMB"
                     if exist('history','var')
-                        mu = damageFactor(history(neigh_ind),x(ii,:),x(jj,:)); % NoFail not required
+                        mu = damageFactor(history(neigh_ind),x(ii,:),x(jj,:),damage,[],model); % NoFail not required
                     else
                         mu = 1;
                     end
-                    p = antiderivative(s);
+                    p = antiderivative(s,damage);
                     w = 1/2*c(1)*influenceFunction(norma,par_omega)*norma^2*p*mu;
                     W = W + w*partialAreas(neigh_ind);
                 case "Linearized LPS bond-based"
@@ -40,22 +39,22 @@ global model
                     end
                 case "Lipton Free Damage"
                     if exist('history','var')
-                        H = damageFactor(history(1,neigh_ind,:),x(ii,:),x(jj,:));
+                        H = damageFactor(history(1,neigh_ind,:),x(ii,:),x(jj,:),damage,[],model);
                     else
                         H = [1 1 1];
                     end
                     Slin = dot(xi,eta)/norma^2;
                     V_delta = pi*horizon^2;
-                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c))*partialAreas(neigh_ind);
+                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind);
                     if jj == familySet(end)
-                        W = W + 1/horizon^2*H(2)*g_potential(theta_i,c);
+                        W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
+                        W = W/2; % Teste
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);
                     W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind);
                     if jj == familySet(end)
                         W = W + c(1)*theta_i^2/2;
-                        W = W*2; % Teste
                     end
                 otherwise
                     break
@@ -64,9 +63,11 @@ global model
     end
 end
 
-function p = antiderivative(x)
+function p = antiderivative(x,damage)
     % Modified PMB model
-    global S0 S1
+    %global S0 S1
+    S0 = damage.S0;
+    S1 = damage.S1;
     % Evaluate integration constants
     A = [1 0 0 0 0; 0 1 0 0 0; 1 0 0 -1 0; 0 0 1 0 0; 0 0 -1 0 1];
     b = [S0(1)^2/2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
@@ -88,8 +89,7 @@ function p = antiderivative(x)
     end
 end
 
-function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c)
-    global model
+function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model)
     horizon = par_omega(1);
     familySet = family(family~=0);
     neigh_ind = 1;
@@ -118,11 +118,10 @@ function theta = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c)
     end
 end
 
-function ff = f_potential(x,c)
-global damageOn
+function ff = f_potential(x,c,damage)
 r1 = 3.0;
 r2 = 3.0;
-if damageOn
+if damage.damageOn
     if x <= r1
         ff = c(1)*x^2/2;
     elseif x > r2
@@ -133,11 +132,10 @@ else
 end
 end
 
-function gg = g_potential(x,c)
-global damageOn
+function gg = g_potential(x,c,damage)
 r1 = 3.0;
 r2 = 3.0;
-if damageOn
+if damage.damageOn
     if x <= r1
         gg = c(2)*x^2/2;
     elseif x > r2

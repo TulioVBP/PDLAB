@@ -33,9 +33,9 @@ function strainPlot(x,u)
     h = norm(x(1,:) - x(2,:)); % grid spacing
     x_lim = [min(x(:,1)) max(x(:,1))];
     y_lim = [min(x(:,2)) max(x(:,2))];
-    %bottom = find(x(:,2) < (y_lim(1) + 1e-12));
+    bottom = find(x(:,2) < (y_lim(1) + 1e-12));
     top = find(x(:,2) > (y_lim(2) - 1e-12));
-    %left = find(x(:,1) < (x_lim(1) + 1e-12));
+    left = find(x(:,1) < (x_lim(1) + 1e-12));
     right = find(x(:,1) > (x_lim(2) - 1e-12));
     N = 0; % Number of nodes in a row
     for ii = 1:length(x)
@@ -44,41 +44,48 @@ function strainPlot(x,u)
         end
         N = N+1;
     end
+    out_layers = [top; bottom; left; right];
     for ii = 1:length(x)
-        if sum(ii == top) == 1 && sum(ii == right) == 1
-            % Top right corner
-            exx(ii) = (v(ii) - v(ii-1))/h; % dv/dx
-            eyy(ii) = (w(ii) - w(ii-N))/h; % dw/dy
-            exy(ii) = 1/2/h*(v(ii) - v(ii-N) + w(ii-1) - w(ii)); % 1/2*(dv/dy + dw/dx)
-        elseif sum(ii == top) == 1
-            % Top edge
-            exx(ii) = (v(ii+1) - v(ii))/h; % dv/dx
-            eyy(ii) = (w(ii) - w(ii-N))/h; % dw/dy
-            exy(ii) = 1/2/h*(v(ii) - v(ii-N) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
-        elseif sum(ii == right) == 1
-            % Right edge
-            exx(ii) = (v(ii) - v(ii-1))/h; % dv/dx
-            eyy(ii) = (w(ii+N) - w(ii))/h; % dw/dy
-            exy(ii) = 1/2/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
+%         if sum(ii == top) == 1 && sum(ii == right) == 1
+%             % Top right corner
+%             exx(ii) = (v(ii) - v(ii-1))/h; % dv/dx
+%             eyy(ii) = (w(ii) - w(ii-N))/h; % dw/dy
+%             exy(ii) = 1/2/h*(v(ii) - v(ii-N) + w(ii-1) - w(ii)); % 1/2*(dv/dy + dw/dx)
+%         elseif sum(ii == top) == 1
+%             % Top edge
+%             exx(ii) = (v(ii+1) - v(ii))/h; % dv/dx
+%             eyy(ii) = (w(ii) - w(ii-N))/h; % dw/dy
+%             exy(ii) = 1/2/h*(v(ii) - v(ii-N) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
+%         elseif sum(ii == right) == 1
+%             % Right edge
+%             exx(ii) = (v(ii) - v(ii-1))/h; % dv/dx
+%             eyy(ii) = (w(ii+N) - w(ii))/h; % dw/dy
+%             exy(ii) = 1/2/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
+%         else
+        if ~ismember(ii,out_layers)
+            % Bulk nodes
+            exx(ii) = (v(ii+1) - v(ii-1))/2*h; % dv/dx
+            eyy(ii) = (w(ii+N) - w(ii-N))/2*h; % dw/dy
+            exy(ii) = 1/4/h*(v(ii+N) - v(ii-N) + w(ii+1) - w(ii-1)); % 1/2*(dv/dy + dw/dx)
         else
-            % Bulk nodes (or left/bottom nodes)
-            exx(ii) = (v(ii+1) - v(ii))/2*h; % dv/dx
-            eyy(ii) = (w(ii+N) - w(ii))/2*h; % dw/dy
-            exy(ii) = 1/4/h*(v(ii+N) - v(ii) + w(ii+1) - w(ii)); % 1/2*(dv/dy + dw/dx)
-        end        
+            exx(ii) = 0; % dv/dx
+            eyy(ii) = 0; % dw/dy
+            exy(ii) = 0;
+        end
     end
     %% Transforming into matrix
-    b = max(x(:,1) - min(x(:,1)));
-    a = max(x(:,2) - min(x(:,2)));
     h = norm(x(1,:) - x(2,:));
+    b = max(x(:,1))-h/2 - min(x(:,1))+h/2;
+    a = max(x(:,2))-h/2 - min(x(:,2))+h/2;
     % Transforming into a matrix array
-    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1)),min(x(:,2)):h:max(x(:,2)));
     EXX = zeros(size(X)); EYY = zeros(size(Y)); EXY = zeros(size(X));
     for jjj = 1:size(X,2)
         for iii = 1:size(Y,1)
             %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
             %reliable
             coord = [X(1,jjj) Y(iii,1)];
+            ind = [];
             for ii = 1:length(x)
                if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
                    ind = ii;
@@ -96,13 +103,14 @@ function strainPlot(x,u)
     end
     %% Plot
     figure
-    surf(X,Y,EXX)
+    subplot(2,1,1)
+    surf(X(2:end-1,2:end-1),Y(2:end-1,2:end-1),EXX(2:end-1,2:end-1))
     xlabel x
     ylabel y
     zlabel \epsilon_x
     
-    figure
-    surf(X,Y,EYY)
+    subplot(2,1,2)
+    surf(X(2:end-1,2:end-1),Y(2:end-1,2:end-1),EYY(2:end-1,2:end-1))
     xlabel x
     ylabel y
     zlabel \epsilon_y
@@ -136,13 +144,15 @@ function displacementPlot(x,u)
         end        
     end
     figure
+    subplot(2,1,1)
     surf(X,Y,V)
     xlabel x
     ylabel y
     zlabel ux
     set(gca,'FontSize',15)
     
-    figure
+    %figure
+    subplot(2,1,2)
     surf(X,Y,W)
     xlabel x
     ylabel y

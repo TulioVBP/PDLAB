@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,par_omega,c,separatorDamage,dt,history,noFail) 
+function [f,history,mu] = interactionForce_LLPS(x,u,ii,dof_vec,familyMat,partialArea,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail) 
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);

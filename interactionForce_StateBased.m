@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_StateBased(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,separatorDamage,dt,history,noFail)
+function [f,history,mu] = interactionForce_StateBased(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
     nu = c(3);
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);

@@ -1,4 +1,4 @@
-function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
+function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,tractionOpt)
 %% INPUT parameter: 
 % - x: the nodes position 
 % - stresses: [sigma_x, sigma_y, tau_xy]
@@ -18,7 +18,8 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
 
     %% DEFINE THE BOUNDARY CONDITIONS
-    if true
+    if test
+        % Implement here your test
         % Example of BCs
         b = max(x(:,1));
         rightLay = find(x(:,1) == b);
@@ -29,6 +30,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
         bc_set(:,1) = sort(bc_set(:,1));
         bc_set(:,2:3) = zeros(length(bc_set(:,1)),2);
     else
+        % Experiment itself
         a = max(x(:,2));
         bottomLay = find(x(:,2) == 0);
         topLay = find(x(:,2) == a);
@@ -59,10 +61,25 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A)
     % Ensure compatibility between idb for constrained nodes and bc_set -
     % TO BE DONE
     %% DEFINE THE BODY FORCE
-    [b_old,noFail] = bodyForce(x,stresses, m, h, A);
+    [b_old,noFail] = bodyForce(x,stresses, m, h, A,tractionOpt);
     bb = zeros(2*length(x),1);
     for ii = 1:length(b_old)
         dofi = [idb(2*ii-1) idb(2*ii)];
         bb(dofi) = b_old(ii,:)'; % Assigning the body force values to the collumn vector
     end
+    
+   %% Plot the b.c.s
+   figure 
+   scatter(x(:,1),x(:,2),'b','filled')
+   hold on
+   scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled')
+   if ~isempty(bc_set) 
+    scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled')
+   end
+   axis equal
+   grid on
+   legend('Free nodes','Traction forces nodes','Displacement const. nodes')
+   xlabel('x (m)'); ylabel('y (m)')
+   title('Boundary conditions')
+   set(gca,'FontSize',13)
 end

@@ -1,8 +1,7 @@
 % Function created to initialize history dependent variables
-function history = historyDependency(x,maxNeigh)
+function history = historyDependency(x,maxNeigh,model)
 % OUTPUT
 % - history: 3D matrix with the variables
-global model
 
 switch model.name
     case "PMB"
