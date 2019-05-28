@@ -1,6 +1,6 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,T,ndof,par_omega,c,model,damage)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-6; % According to the roadmap
 N = length(u);
@@ -34,8 +34,8 @@ for ii=1:length(x)
                     [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                 end
                 %[T_minus,~,~] = T(x(ii,:),x(kk,:),u_minus(dofi)',u_minus(dofk)');
-                f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero
-                f_minus = T_minus*partialAreas(ii,family(ii,:)==kk)*h^2; % S_max set to zero again
+                f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*surfaceCorrection(ii,family(ii,:)==kk)*h^2; % S_max set to zero
+                f_minus = T_minus*partialAreas(ii,family(ii,:)==kk)*surfaceCorrection(ii,family(ii,:)==kk)*h^2; % S_max set to zero again
                 f_diff = f_plus - f_minus;
                 %for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
                     K(dofi,rr) = K(dofi,rr) + f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second

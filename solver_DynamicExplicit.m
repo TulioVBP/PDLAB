@@ -1,6 +1,6 @@
 % Explicit time - dynamic solver
 
-function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,partialAreas,T,c,rho,model,par_omega,history,noFailZone,damage)
+function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll)
     ndof = 2*length(x) - length(bc_set);
     %% Create volume
     h = norm(x(1,:)-x(2,:));
@@ -22,20 +22,25 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
     %% INITIALIZE SIMULATION MATRICES 
-        %parpool(2)
+        if b_parll
+            poolobj = parpool(2);
+        end
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
         W = zeros(length(x),length(t)); % No initial deformation
         % Initial condition
         u_n = zeros(2*length(x),length(t)); % 2*N x n  2D matrix
         v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.ffz
-        bn = b;%bodyForce(x,stresses,m,h,A);
+        bn = body_force;%bodyForce(x,stresses,m,h,A);
         energy.W = zeros(length(x),length(t));
         energy.KE = zeros(length(x),length(t));
         energy.EW = zeros(length(x),length(t));
         fn = zeros(2*length(x),1); % Initial force
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
-        history_up = history;
+        % Temporary variables
+        history_temp = history;
+        fn_temp = zeros(size(x));
+        phi_temp = zeros(length(x),1);
         for n = 1:length(t)-1
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
@@ -55,45 +60,23 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
             % ### Step 3 - Update velocity
             % Evaluate f[n+1]
             fn = zeros(2*length(x),1); % Instatiate force vector
-            for ii = 1:length(x)
-                dofi = dof_vec(ii,:);
-                % Loop on the nodes
-               areaTot = 0; partialDamage = 0; % Instatiate for damage index
-               family = familyMat(ii,familyMat(ii,:)~=0);
-               neig_index = 1;
-               for jj = family
-                   % Loop on their neighbourhood
-                   noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
-                   if model.dilatation
-                      [fij,history_up(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history(ii,neig_index,:),noFail);
-                   else
-                      [fij,history_up(ii,neig_index,:),mu_j] = T(x,u_n(:,n+1),ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history(ii,neig_index),noFail);
-                   end
-                   Vj = partialAreas(ii,neig_index);
-                   fn(dofi) = fn(dofi) + (fij')*Vj;
-                   % Damage index
-                   areaTot = areaTot + Vj;
-                   partialDamage = partialDamage + mu_j*Vj;
-                    %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
-                   if ~model.dilatation
-                   % Strain energy
-                   W(ii,n+1) = W(ii,n+1) + strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,par_omega,c,model,damage,history(ii,neig_index));
-                   % 1/2 factor not truly understood.
-                   end
-                   neig_index = neig_index + 1;
-               end
-               if model.dilatation
-               % Strain energy
-               W(ii,n+1) = strainEnergyDensity(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),ii,idb,par_omega,c,model,damage,history(ii,:,:));
-               end
-               phi(ii,n+1) = 1 - partialDamage/areaTot;
-               % External work
-               energy.EW(ii,n+1) = dot(u_n(dofi,n+1),b(dofi))*V;
-               % Stored strain energy
-               energy.W(ii,n+1) = W(ii,n+1)*V;
-               % Kinectic energy - 
-               %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;
+            if b_parll
+                parfor ii = 1:length(x)
+                   [fn_temp(ii,:),history_temp(ii,:,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,noFailZone,history,T,W,V,body_force);
+                end
+            else 
+                for ii = 1:length(x)
+                   [fn_temp(ii,:),history_temp(ii,:,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,noFailZone,history,T,W,V,body_force);
+                end
             end
+            % Converting the temporary variables
+            for ii = 1:length(x)
+                fn(dof_vec(ii,:)) = fn_temp(ii,:)';
+            end
+            history = history_temp;
+            phi(:,n+1) = phi_temp;
+            energy.W(:,n+1) = energy_pot;
+            energy.EW(:,n+1) = energy_ext;
             % Evaluate V(n+1)
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1) is stored in the next V(n)
             % Kinectic energy
@@ -101,14 +84,16 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,b,bc_set,familyMat,pa
                 dofk = dof_vec(kk,:);
                 energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2*V;
             end
-            % Update history matrix;
-            history = history_up;
+            
             % ############ COUNTING THE PROCESSING TIME #############
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")
             %pause
         end
+        if b_parll
+            delete(poolobj);
+        end
 end
-
+%%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt = zeros(length(x),1);
     for ii = 1:length(x)
@@ -125,4 +110,47 @@ function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
         dt(ii) = sqrt(2*rho/den);
     end
     dt_crit = min(dt); % Critical time step
+end
+%%
+function [f_i,history_up,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,noFailZone,history,T,W,V,body_force)
+   dofi = dof_vec(ii,:);
+   % Loop on the nodes
+   areaTot = 0; partialDamage = 0; % Instatiate for damage index
+   family = familyMat(ii,familyMat(ii,:)~=0);
+   f_i = 0;
+   history_up = history(ii,:,:);
+   damage.phi = phi(ii);
+   for neig_index = 1:length(family)
+       jj = family(neig_index);
+       % Loop on their neighbourhood
+       noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
+       if model.dilatation
+          [fij,history_up(1,neig_index,:),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history(ii,neig_index,:),noFail);
+       else
+          [fij,history_up(1,neig_index,:),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history(ii,neig_index),noFail);
+       end
+       Vj = partialAreas(ii,neig_index);
+       lambda = surfaceCorrection(ii,neig_index);
+       f_i = f_i + (fij)*Vj*lambda;
+       % Damage index
+       areaTot = areaTot + Vj;
+       partialDamage = partialDamage + mu_j*Vj;
+        %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
+       if ~model.dilatation
+           % Strain energy
+           W(ii) = W(ii) + strainEnergyDensity(x,u_n,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_up(1,neig_index));
+           % 1/2 factor not truly understood.
+       end
+   end
+   if model.dilatation
+       % Strain energy
+       W(ii) = strainEnergyDensity(x,u_n,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history_up(1,:,:));
+   end
+   phi_up = 1 - partialDamage/areaTot;
+   % External work
+   energy_ext = dot(u_n(dofi),body_force(dofi))*V;
+   % Stored strain energy
+   energy_pot = W(ii)*V;
+   % Kinectic energy - 
+   %energy.KE(ii,n+1) =  1/2*rho*norm(v_n(dofi,2))^2*V;
 end

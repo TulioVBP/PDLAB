@@ -53,11 +53,18 @@ end
 function mu = mu_model(x,damage,model)
 % INPUT
 % x - Stretch
-S0 = damage.S0;
-S1 = damage.S1;
 
 switch model.name
     case "PMB"
+        % Damage dependent crack
+        alfa = 0.2; beta = 0.2; gamma = 1.4;
+        if damage.phi > alfa
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+        else
+            Sc = damage.Sc;
+        end
+        S0 = [-0.98 0.95*Sc]; % S0- and S0+
+        S1 = [-0.99 1.05*Sc]; % S1- and S1+
         if x < S0(2) && x > -1
             mu = 1;
         elseif x > S0(2) && x < S1(2)

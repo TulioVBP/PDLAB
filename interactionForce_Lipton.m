@@ -94,7 +94,7 @@ if damageOn
     if x <= r1
         ff = c(1)*x*sqrt(norma);
     elseif x > r2
-        ff = norma;
+        ff = sqrt(norma);
     end
 else
     ff = c(1)*x*sqrt(norma);

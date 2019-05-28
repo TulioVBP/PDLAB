@@ -1,4 +1,4 @@
-function PostProcessing(x,u,n,idb,energy,phi)
+function PostProcessing(x,u,n,idb,energy,phi,dt)
 close all
 % Input: 
 % - x = [x y]: position matrix
@@ -18,13 +18,18 @@ strainPlot(x,u(:,:,n)); % To be perfected
 if exist('phi','var')~=0
     damagePlot(x,phi(:,n));
 end
+
+%% Plot the crack properties
+if exist('dt','var')
+    trackCrack(x,phi,n,dt);
+end
+
 %% Plot the total energy
 if exist('energy','var')~=0
     energyPlot(x,energy,n);
 end
+
 end
-
-
 
 function strainPlot(x,u)
     %% Function to plot the displacement
@@ -115,7 +120,6 @@ function strainPlot(x,u)
     ylabel y
     zlabel \epsilon_y
 end
-
 
 function displacementPlot(x,u)
     b = max(x(:,1) - min(x(:,1)));
@@ -267,6 +271,46 @@ function energyPlot(x,energy,n_final)
     title('Strain Energy Density')
     set(gca,'FontSize',15)
    
+end
+
+function trackCrack(x,phi,n_final,dt)
+    data_dump = 80; % Every 80 timesteps
+    if n_final < data_dump
+       data_dump = n_final; 
+    end
+    samples = floor(n_final/data_dump+1/2);
+    V_l = zeros(samples,1);
+    for n_samp = 0:samples
+        n = 1+data_dump*n_samp;
+        set_dam = find(phi(:,n) > 0.35); % Binary of greater than 0.35 damage index
+        x_dam = x(set_dam,:); % Set of probable tips
+        x_max = max(x_dam(:,1));
+        if ~isempty(set_dam)
+            damx_ind = (x_dam(:,1) > x_max - 1e-12);
+            set_dam = set_dam(damx_ind);
+            if length(set_dam) > 1
+                y_max = max(x_dam(damx_ind,2));
+                damy_ind = (x_dam(damx_ind,2) > y_max - 1e-12);
+                set_dam = set_dam(damy_ind);
+                tip(2) = set_dam;
+            else
+                tip(2) = set_dam;
+            end
+            if n_samp > 1
+                V_l(n_samp+1) = norm(x(tip(2),:)-x(tip(1),:))/dt/data_dump;
+                tip(1) = tip(2);
+            else
+                tip(1) = set_dam;
+            end
+        end           
+    end
+    % Plot the velocity
+    figure
+    plot(0:samples,V_l,'-d','LineWidth',1.5)
+    xlabel('Sample')
+    ylabel('Velocity of the crack tip (m/s)')
+    set(gca,'FontSize',13)
+    grid on
 end
 
 function u = threeDModification(x,u_2D,idb)

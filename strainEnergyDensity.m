@@ -1,4 +1,4 @@
-function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,model,damage,history)
+function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
@@ -24,16 +24,16 @@ function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,mode
                     end
                     p = antiderivative(s,damage);
                     w = 1/2*c(1)*influenceFunction(norma,par_omega)*norma^2*p*mu;
-                    W = W + w*partialAreas(neigh_ind);
+                    W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                 case "Linearized LPS bond-based"
                     extension = dot(eta,xi)/norma;
                     w = 1/2*c(1)*influenceFunction(norma,par_omega)*extension^2/2;
-                    W = W + w*partialAreas(neigh_ind);
+                    W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                 case "Linearized LPS"
                     kappa = c(1)*m/2+c(2)*m/3;
                     alfa = c(2);
                     w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
-                    W = W + w*partialAreas(neigh_ind);
+                    W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                     if jj == familySet(end)
                         W = W + kappa*theta_i^2/2;
                     end
@@ -45,14 +45,14 @@ function W = strainEnergyDensity(x,u,family,partialAreas,ii,idb,par_omega,c,mode
                     end
                     Slin = dot(xi,eta)/norma^2;
                     V_delta = pi*horizon^2;
-                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind);
+                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                     if jj == familySet(end)
                         W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
                         W = W/2; % Teste
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);
-                    W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind);
+                    W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                     if jj == familySet(end)
                         W = W + c(1)*theta_i^2/2;
                     end
@@ -66,26 +66,37 @@ end
 function p = antiderivative(x,damage)
     % Modified PMB model
     %global S0 S1
-    S0 = damage.S0;
-    S1 = damage.S1;
-    % Evaluate integration constants
-    A = [1 0 0 0 0; 0 1 0 0 0; 1 0 0 -1 0; 0 0 1 0 0; 0 0 -1 0 1];
-    b = [S0(1)^2/2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
-        0;
-        S0(1)/(S0(1) - S1(1))*(S1(1)^2/2);
-        S0(2)^2/2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
-        S0(2)/(S1(2) - S0(2))*S1(2)^2/2];
-    C = A\b;
-    if x <  S1(1)
-        p = C(4); % C4
-    elseif x < S0(1)
-        p = S0(1)/(S0(1) - S1(1))*(x^2/2 - S1(1)*x) + C(1);
-    elseif x < S0(2)
-        p = x^2/2 + C(2);
-    elseif x < S1(2)
-        p = S0(2)/(S1(2) - S0(2))*(S1(2)*x - x^2/2) + C(3);
+    if damage.damageOn
+        % Damage dependent crack
+        alfa = 0.2; beta = 0.2; gamma = 1.4;
+        if damage.phi > alfa
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+        else
+            Sc = damage.Sc;
+        end
+        S0 = [-0.98 0.95*Sc]; % S0- and S0+
+        S1 = [-0.99 1.05*Sc]; % S1- and S1+
+        % Evaluate integration constants
+        A = [1 0 0 0 0; 0 1 0 0 0; 1 0 0 -1 0; 0 0 1 0 0; 0 0 -1 0 1];
+        b = [S0(1)^2/2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
+            0;
+            S0(1)/(S0(1) - S1(1))*(S1(1)^2/2);
+            S0(2)^2/2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
+            S0(2)/(S1(2) - S0(2))*S1(2)^2/2];
+        C = A\b;
+        if x <  S1(1)
+            p = C(4); % C4
+        elseif x < S0(1)
+            p = S0(1)/(S0(1) - S1(1))*(x^2/2 - S1(1)*x) + C(1);
+        elseif x < S0(2)
+            p = x^2/2 + C(2);
+        elseif x < S1(2)
+            p = S0(2)/(S1(2) - S0(2))*(S1(2)*x - x^2/2) + C(3);
+        else
+            p = C(5);
+        end
     else
-        p = C(5);
+        p = x^2/2;
     end
 end
 

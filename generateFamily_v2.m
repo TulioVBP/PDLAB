@@ -1,5 +1,6 @@
-function [family,partialAreas,maxNeigh] = generateFamily_v2(x,horizon,d,option,test,PA_alg)
+function [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,horizon,d,option,test,PA_alg,surf_Alg)
 % PA-HHB IMPLEMENTATION
+% Volume correction implementation
 % INPUT : 
 %---------
 % x - Position of the nodes
@@ -227,6 +228,7 @@ if exist(filename,'file') == 0
         otherwise
             error("Partial area algorithm not yet implemented")
     end
+    %% SAVE
     if find(family(:,columns)~=0)~=0
         disp('Warning: family matrix is not big enough to acomodate all neighbours. Please check the file generateFamily.m.');
     else
@@ -236,5 +238,23 @@ if exist(filename,'file') == 0
 else
     load(filename)
     cd ../
+end
+%% Surface correction algorithm
+    % Volume method
+    surfaceCorrection = zeros(size(partialAreas));
+    V0 = pi*horizon^2;
+     N = size(x,1);
+    for iI = 1:N
+        for iII = 1:length(family(iI,family(iI,:)~=0))
+            jj = family(iI,iII);
+            switch surf_Alg
+                case "Volume"
+                    surfaceCorrection(iI,iII) = 2*V0/(sum(partialAreas(iI,:)) + sum(partialAreas(jj,:)));
+                otherwise
+                    surfaceCorrection(iI,iII) = 1;
+            end
+        end
+        display(strcat('Generating surface correction..',num2str(iI/N*100),'%'));
+    end
 end
 

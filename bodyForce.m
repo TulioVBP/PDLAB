@@ -59,7 +59,7 @@ end
     end
     %% Defining no fail zone
     noFailZone = zeros(length(x),1);    
-    %noFailZone(topLayer) = true;
-    %noFailZone(bottomLayer) = true;
+    noFailZone(topLayer) = true;
+    noFailZone(bottomLayer) = true;
     %noFailZone = find(b(:,1)~= 0 | b(:,2)~= 0); % Criterion 1: if a traction force is applied to the node, it is no fail zone
 end
