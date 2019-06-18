@@ -47,8 +47,8 @@ function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,id
                     V_delta = pi*horizon^2;
                     W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                     if jj == familySet(end)
-                        W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
                         W = W/2; % Teste
+                        W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);

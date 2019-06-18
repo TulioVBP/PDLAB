@@ -24,49 +24,7 @@ b_parallelComp = false;
 damage.damageOn = true; % True if applying damage to the model, false if not
 model.name = "PMB"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage" "LPS 2D" "Linearized LPS"
 solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit"
-switch model.name
-    case "PMB"
-        alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
-        mm = weightedVolume(par_omega);
-        c(1) = 6*E*1e6/mm;
-        T = @interactionForce_PMB;
-        model.linearity = false;
-        model.stiffnessAnal = false;
-        model.dilatation = false;
-        % Damage dependent Sc
-        if true
-            damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
-        else
-            damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
-        end
-    case "Linearized LPS bond-based"
-        alfa = 0; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
-        mm = weightedVolume(par_omega); 
-        c(1) = 6*E*1e6/mm;
-        T = @interactionForce_LLPSBB;
-        model.linearity = true;
-        model.stiffnessAnal = true; % true if an analytical stiffness matrix for such model is implemented
-        model.dilatation = false;
-    case "Lipton Free Damage"
-        alfa = 1;
-        mm = weightedVolume(par_omega);
-        c(1) = 8*pi*horizon^3/mm*E*1e6/(1+nu)/2;
-        c(2) = (2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu))/2;
-        T = @interactionForce_Lipton;
-        model.linearity = true;
-        model.stiffnessAnal = false;
-        model.dilatation = true;
-    case "LPS 2D"
-        alfa = 1;
-        mm = weightedVolume(par_omega);
-        kappa = E*1e6/3/(1-2*nu); mu = E*1e6/2/(1+nu);
-        c(1) = kappa + mu/9*(nu+1)^2/(2*nu-1)^2;
-        c(2) = 8*mu/mm;
-        c(3) = nu;
-        T = @interactionForce_StateBased;
-        model.linearity = false;
-        model.stiffnessAnal = false;
-        model.dilatation = true;
+[model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu); % Check if it works
 %     case "Linearized LPS"
 %         %nu = 1/4;
 %         alfa = 1; % If alpha = 1, I'm basically reducing the linearized bond based model to the linearized PMB model
@@ -79,9 +37,7 @@ switch model.name
 %         model.linearity = true;
 %         model.stiffnessAnal = false; % true if an analytical stiffness matrix for such model is implemented
 %         model.dilatation = true;
-    otherwise
-        error("Chosen model is not implemented or it was mistyped");
-end
+    
 
 %% SIMULATION
 for s_index = 1:length(sigma)
@@ -96,7 +52,7 @@ for s_index = 1:length(sigma)
         b = 0.10; % length [m]
         [x,A] = generateMesh(h,[a b]); % Generates rectangular mesh 
         %% -------------- Boundary conditions ----------------
-        [ndof,idb,bc_set,bodyForce,noFailZone] = boundaryCondition(x,stresses,m,h,A,true,'tlr');
+        [ndof,idb,bc_set,bodyForce,noFailZone] = boundaryCondition(x,stresses,m,h,A,false,'tblr');
         %% -------------- GENERATE FAMILY ------------------
         [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,horizon,m,m_index,true,"PA-AC","None"); % True for test
         %% -------------- Generate history variables ------------------

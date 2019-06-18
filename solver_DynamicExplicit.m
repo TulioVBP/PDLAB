@@ -48,13 +48,13 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
             v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1/2)
             % #### Step 2 - Update displacement
             u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
-             % ----- Solving for the constraint nodes ----
+             % ----- Solving for the displacement constraint nodes ----
             if ~isempty(u_const)
                 if sum(bc_set(:,3) ~= 0 & bc_set(:,2) ~= 0)
                     error('The boundary condition matrix bc_set has prescribed both displacement and velocity for the same node.')
                 end
                 u_const(bc_set(:,3) == 0) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity
-                u_const = u_const + bc_set(:,3)*dt;
+                u_const = u_const + bc_set(:,3)*dt; % Updating the velocity constraint nodes
                 u_n(ndof+1:end,n+1) = u_const;
             end
             % ### Step 3 - Update velocity

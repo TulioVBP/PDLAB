@@ -91,9 +91,9 @@ function ff = fscalar(x,norma,c,damageOn)
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
-    if x <= r1
+    if x*sqrt(norma) <= r1
         ff = c(1)*x*sqrt(norma);
-    elseif x > r2
+    elseif x*sqrt(norma) > r2
         ff = sqrt(norma);
     end
 else

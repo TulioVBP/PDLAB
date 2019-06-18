@@ -2,7 +2,7 @@
 
 function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
-epsilon = h*1e-6; % According to the roadmap
+epsilon = h*1e-7; % According to the roadmap
 N = length(u);
 epsilon_vector = zeros(N,1);
  % Defining the node's degree of freedom index
@@ -44,7 +44,9 @@ for ii=1:length(x)
             epsilon_vector(rr) = 0; % Resetting to zero
         end
     end
-    disp("Constructing the stiffness matrix: " + num2str(ii/length(x)*100) + "%")
+    if ii == floor(length(x)/2) || ii == floor(length(x)/4) || ii == 3*floor(length(x)/4)
+        disp("Constructing the stiffness matrix: " + num2str(ii/length(x)*100) + "%")
+    end
 end
 %% Adapting for the constrained dofs
 for ii = ndof+1:length(u)

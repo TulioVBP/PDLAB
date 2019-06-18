@@ -29,7 +29,7 @@ switch option
         % P7
         w = (1 - 35*(norma/horizon)^4 + 84*(norma/horizon)^5 - 70*(norma/horizon)^6 + 20*(norma/horizon)^7)/norma^alfa;
 end
-% if w < 0
-%     w = 0;
-% end
+if w < 0
+    w = 0;
+end
 end

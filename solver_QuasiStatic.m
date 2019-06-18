@@ -19,7 +19,7 @@ for n = 1:n_tot
     %          for the load step.
     epsilon = 10^-4;
     r_vec = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
-    r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec+bn*V,Inf)); % Normalizing the maximum residual
+    r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf)); % Normalizing the maximum residual
     % Step 4 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
     u_trial = un(:,n);
     % Step 5 - Apply Newton's method to minimize the residual.
@@ -30,6 +30,8 @@ for n = 1:n_tot
         while r > r_max
             if ~model.stiffnessAnal 
                 K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage);
+                [~,ev] = eig(K);
+                sum(ev>0);
             else
                 K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage);
             end
@@ -39,12 +41,14 @@ for n = 1:n_tot
             u_trial = u_trial + du;
             r_vec = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
             r = norm(r_vec,Inf);
-            r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec+bn*V,Inf));
+            %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
             disp("Current residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
         end
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
-        un(:,n) = u_trial; 
-        un(:,n+1) = u_trial; % For the next iteration
+        un(:,n) = u_trial;
+        if n < n_tot
+            un(:,n+1) = u_trial; % For the next iteration
+        end
     else
         % Linear model
         if n < 2 % If the model is linear, there is no need to find the matrix more than once

@@ -175,6 +175,20 @@ function displacementPlot(x,u)
     ylabel y
     set(gca,'FontSize',15)
     legend('Reference','Deformed')
+    axis equal
+    view(2)
+    
+    %% Plot displacement in a quiver
+    figure
+    scatter(x(:,1),x(:,2))
+    hold on
+    quiver(x(:,1),x(:,2),u(:,1),u(:,2))
+    xlabel('x (m)')
+    ylabel('y (m)')
+    axis equal
+    grid on
+    set(gca,'FontSize',13)
+    
 %     % Scatter
 %     figure
 %     scatter(x(:,1),x(:,2),'b','filled')
@@ -222,6 +236,7 @@ function damagePlot(x,phi)
     colormap(c);
     colorbar
     caxis([0 1]);
+    axis equal
 end
 
 function energyPlot(x,energy,n_final)
