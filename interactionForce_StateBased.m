@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_StateBased(x,u,theta,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
+function [f,history,mu] = interactionForce_StateBased(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
     nu = c(3);
     jj = familyMat(ii,neighIndex);
     x_i = x(ii,:); x_j = x(jj,:);
@@ -21,23 +21,22 @@ function [f,history,mu] = interactionForce_StateBased(x,u,theta,ii,dof_vec,famil
     end
     % ---- Evaluatin the force ----
     % Dilatation term
-%     theta = [0 0];
-%     m = weightedVolume(par_omega);
-%     for bond = [ii jj]
-%         dofb = dof_vec(bond,:);
-%         u_b = u(dofb)';
-%         neighInd2 = 1;
-%         for kk = familyMat(bond,familyMat(bond,:)~=0)
-%             zeta = x(kk,:) - x(bond,:);
-%             dofk = dof_vec(kk,:);
-%             u_k = u(dofk)';
-%             eta_2 = u_k - u_b;
-%             e_z = norm(zeta+eta_2) - norm(zeta); % Elongation
-%             theta((bond == ii) + 2*(bond == jj))= 2*(2*nu-1)/(nu-1)/m*influenceFunction(norm(zeta),par_omega)*norm(zeta)*e_z*partialAreas(bond,neighInd2) +  theta((bond == ii) + 2*(bond == jj)); % The boolean operator returns 1 if equal to ii and 2 if equal to jj
-%             neighInd2 = neighInd2 + 1;
-%         end
-%     end
-    theta = [theta(ii) theta(jj)];
+    theta = [0 0];
+    m = weightedVolume(par_omega);
+    for bond = [ii jj]
+        dofb = dof_vec(bond,:);
+        u_b = u(dofb)';
+        neighInd2 = 1;
+        for kk = familyMat(bond,familyMat(bond,:)~=0)
+            zeta = x(kk,:) - x(bond,:);
+            dofk = dof_vec(kk,:);
+            u_k = u(dofk)';
+            eta_2 = u_k - u_b;
+            e_z = norm(zeta+eta_2) - norm(zeta); % Elongation
+            theta((bond == ii) + 2*(bond == jj))= 2*(2*nu-1)/(nu-1)/m*influenceFunction(norm(zeta),par_omega)*norm(zeta)*e_z*partialAreas(bond,neighInd2) +  theta((bond == ii) + 2*(bond == jj)); % The boolean operator returns 1 if equal to ii and 2 if equal to jj
+            neighInd2 = neighInd2 + 1;
+        end
+    end
     % Additional integral term
     add_term = [0 0];
     for bond = [ii jj]

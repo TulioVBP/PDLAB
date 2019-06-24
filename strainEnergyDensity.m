@@ -1,20 +1,16 @@
-function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history,b_end)
+function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
     m = weightedVolume(par_omega);
     horizon = par_omega(1);
-    if ~exist('b_end','var')
-        b_end = false;
-    end
     % Evaluate dilatation
-    %if model.dilatation
-    %    theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);
-    %end
+    if model.dilatation
+        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);
+    end
     neigh_ind = 1;
     for jj = familySet
-            x_j = x_imp(jj,:);
-            xi =  x_j - x(ii,:);
+            xi = x(jj,:) - x(ii,:);
             dofj = [idb(2*jj-1) idb(2*jj)];
             eta = u(dofj)' - u(dofi)';
             norma = norm(xi);
@@ -22,7 +18,7 @@ function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCo
             switch model.name
                 case "PMB"
                     if exist('history','var')
-                        mu = damageFactor(history(neigh_ind),x(ii,:),x_j,damage,[],model); % NoFail not required
+                        mu = damageFactor(history(neigh_ind),x(ii,:),x(jj,:),damage,[],model); % NoFail not required
                     else
                         mu = 1;
                     end
@@ -38,7 +34,7 @@ function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCo
                     alfa = c(2);
                     w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
                     W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if (length(familySet)>1 && jj == familySet(end)) || b_end == true
+                    if jj == familySet(end)
                         W = W + kappa*theta_i^2/2;
                     end
                 case "Lipton Free Damage"
@@ -49,15 +45,15 @@ function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCo
                     end
                     Slin = dot(xi,eta)/norma^2;
                     V_delta = pi*horizon^2;
-                    W = W+1/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if (length(familySet)>1 && jj == familySet(end)) || b_end == true
-                        %W = W/2; % Teste
+                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
+                    if jj == familySet(end)
+                        W = W/2; % Teste
                         W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);
                     W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if (length(familySet)>1 && jj == familySet(end)) || b_end == true
+                    if jj == familySet(end)
                         W = W + c(1)*theta_i^2/2;
                     end
                 otherwise
