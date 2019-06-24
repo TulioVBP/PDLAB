@@ -21,7 +21,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
-    %% INITIALIZE SIMULATION MATRICES 
+    %% INITIALIZE SIMULATION MATRICES
         if b_parll
             poolobj = parpool(2);
         end
@@ -41,7 +41,14 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
         history_temp = history;
         fn_temp = zeros(size(x));
         phi_temp = zeros(length(x),1);
-        for n = 1:length(t)-1
+        % {Recoverying temporary files}
+        n_initial = 1;
+        if exist('tempsim.mat','file')
+            load('tempsim.mat');
+            n_initial = n;
+            disp('Found a partial simulation. Continuing it...')
+        end
+        for n = n_initial:length(t)-1
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 1 - Midway velocity
@@ -88,6 +95,17 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
             % ############ COUNTING THE PROCESSING TIME #############
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")
             %pause
+            % {Checking for running out time}
+            horario = clock;
+            if horario(4) >= 23 && horario(5) >40
+                filename = strcat('tempsim.mat');
+                save(filename,'x','idb','u_n','phi','energy','n');
+                if b_parll
+                    delete(poolobj);
+                end
+                break;
+            end
+                
         end
         if b_parll
             delete(poolobj);
