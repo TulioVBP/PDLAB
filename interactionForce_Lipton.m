@@ -1,4 +1,4 @@
-function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
+function [f,history_up,mu] = interactionForce_Lipton(x,u,theta,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% INPUT
 % x: nodes position
 % u: dof's displacement
@@ -49,6 +49,9 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
     history_up(1) = history(1) + js(S,damage.Sc)*dt;
     % -- Evaluating the dilatation
     % Dilatation term
+    if length(theta) == length(x)
+        theta_i = theta(ii); theta_j = theta(jj);
+    else
     theta_i = 0;
     neighIndex2 = 1;
     for kk = familyMat(ii,familyMat(ii,:)~=0)
@@ -70,6 +73,7 @@ function [f,history_up,mu] = interactionForce_Lipton(x,u,ii,dof_vec,familyMat,pa
         S_z = dot(zeta,eta_2)/norm(zeta)^2;
         theta_j = theta_j + 1/V_delta*influenceFunction(norm(zeta),par_omega)*norm(zeta)^2*S_z*partialAreas(jj,neighIndex2);
         neighIndex2 = neighIndex2  + 1;
+    end
     end
     thetac_p = 0.01;
     thetac_m = 0.01;

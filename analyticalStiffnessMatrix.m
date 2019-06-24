@@ -1,5 +1,5 @@
 % Function to generate the stiffness matrix for the quasi-static solver
-function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,c,model,damage)
+function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,XJ,YJ,V,par_omega,c,model,damage)
 %% INPUT:
 % ------------------------------------------------------------
 % - x: position of the nodes
@@ -26,9 +26,11 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
                 dofi = [idb(2*ii-1) idb(2*ii)];
                 family = familySet(ii,familySet(ii,:)~=0);
                 iII = 1;
+                x_imp = x;
                 for jj = family % j sum
+                    x_imp(jj,:) = [XJ(ii,iII) YJ(ii,iII)];
                     dofj = [idb(2*jj-1) idb(2*jj)];
-                    xi = x(jj,:) - x(ii,:);
+                    xi = x_imp(jj,:) - x(ii,:);
                     normaj = norm(xi);
                     omegaj = influenceFunction(normaj,par_omega);
                     % U

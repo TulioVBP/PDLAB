@@ -36,6 +36,7 @@ else
 end
 %% Checking for family file
 filename = strcat('family',int2str(option),'.mat');
+columns = (2*ceil(d) + 1)^2;
 if exist(filename,'file') == 0
     N = size(x,1);
     lengthx = max(x(:,1)) - min(x(:,1));
@@ -43,7 +44,6 @@ if exist(filename,'file') == 0
     h = x(2,1) - x(1,1); % Spacing of the grid
     numx = floor(lengthx/h+1/2)+1; % Number of collumns in the mesh
     numy = floor(lengthy/h+1/2)+1; % Number of rows in the mesh
-    columns = (2*ceil(d) + 1)^2;
     family = zeros(N,columns); % Instatiate the family matrix. We arbitrarily say that the number of points inside the neighbourhood doesn't surpass 1/5 of the mesh points.
     partialAreas = family; % Also Instatiate familyInfo matrix with zeros
     XJ = family; YJ = family;
@@ -216,7 +216,7 @@ if exist(filename,'file') == 0
                     if iII ~= iI
                         x_j = x(iII,:);
                         xi  = x_j - x_i;
-                        XJ(iI,neigh_index) = x_j(1); YJ(iI,negh_index) = x_j(2); % Initialize the quadrature points
+                        XJ(iI,neigh_index) = x_j(1); YJ(iI,neigh_index) = x_j(2); % Initialize the quadrature points
                         norma = norm(xi);
                         % Check if cell tau_k is contained within the neighborhood of i
                         if norma + h/2 <= horizon
@@ -237,7 +237,26 @@ if exist(filename,'file') == 0
                 display(strcat('Generating family..',num2str(iI/N*100),'%'));
             end
         otherwise
-            error("Partial area algorithm not yet implemented")
+            % No improved quadrature algorithm
+            for iI = 1:N
+                x_i = x(iI,:);
+                neigh_index = 1;
+                for iII = 1:N
+                    if iII ~= iI
+                        x_j = x(iII,:);
+                        xi  = x_j - x_i;
+                        XJ(iI,neigh_index) = x_j(1); YJ(iI,neigh_index) = x_j(2); % Initialize the quadrature points
+                        norma = norm(xi);
+                        if norma <= horizon
+                            family(iI,neigh_index) = iII;
+                            partialAreas(iI,neigh_index) = h^2;
+                            neigh_index = neigh_index+1;
+                        end
+                    end
+                end
+                display(strcat('Generating family..',num2str(iI/N*100),'%'));
+            end
+            %error("Partial area algorithm not yet implemented")
     end
     %% SAVE
     if find(family(:,columns)~=0)~=0

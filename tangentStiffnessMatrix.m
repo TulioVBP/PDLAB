@@ -1,8 +1,8 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,XJ,YJ,T,ndof,par_omega,c,model,damage)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
-epsilon = h*1e-7; % According to the roadmap
+epsilon = h*1e-6; % According to the roadmap
 N = length(u);
 epsilon_vector = zeros(N,1);
  % Defining the node's degree of freedom index
@@ -10,6 +10,7 @@ epsilon_vector = zeros(N,1);
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
+
 %% Initialize the tangent stiffness matrix to zero
 K = zeros(N,N);
 %% Transverse each node in the discretization
@@ -22,16 +23,23 @@ for ii=1:length(x)
             epsilon_vector(rr) = epsilon;
             u_plus = u + epsilon_vector;
             u_minus = u - epsilon_vector;
+            %if model.dilatation
+            %    theta_plus = dilatation(x,u_plus,family,partialAreas,XJ,YJ,idb,par_omega,c,model);
+            %    theta_minus = dilatation(x,u_minus,family,partialAreas,XJ,YJ,idb,par_omega,c,model);
+            %end
+            x_imp = x;
+            neigh_Index = 1;
             for kk = family(ii,family(ii,:)~=0)
+                x_imp(kk,:) = [XJ(ii,neigh_Index) YJ(ii,neigh_Index)];
                 dofi = dof_vec(ii,:);
                 %[T_plus,~,~] = T(x(ii,:),x(kk,:),u_plus(dofi)',u_plus(dofk)');
                 if model.dilatation
                     neigh_Index = find(family(ii,:)==kk);
-                    [T_plus,~,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
-                    [T_minus,~,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
+                    [T_plus,~,~] = T(x_imp,u_plus,[],ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
+                    [T_minus,~,~] = T(x_imp,u_minus,[],ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
                 else
-                    [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
-                    [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+                    [T_plus,~,~] = T(x_imp,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+                    [T_minus,~,~] = T(x_imp,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                 end
                 %[T_minus,~,~] = T(x(ii,:),x(kk,:),u_minus(dofi)',u_minus(dofk)');
                 f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*surfaceCorrection(ii,family(ii,:)==kk)*h^2; % S_max set to zero
@@ -40,11 +48,12 @@ for ii=1:length(x)
                 %for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
                     K(dofi,rr) = K(dofi,rr) + f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
                 %end
+                neigh_Index = neigh_Index +1;
             end
             epsilon_vector(rr) = 0; % Resetting to zero
         end
     end
-    if ii == floor(length(x)/2) || ii == floor(length(x)/4) || ii == 3*floor(length(x)/4)
+    if ii == ceil(length(x)/2) || ii == ceil(length(x)/4) || ii == 3*ceil(length(x)/4)
         disp("Constructing the stiffness matrix: " + num2str(ii/length(x)*100) + "%")
     end
 end
@@ -54,6 +63,7 @@ for ii = ndof+1:length(u)
     K(ii,ii) = 1e10; % Penalty
 end
 end
+
 % if sum(dofj > ngdl) == 2
 %             % Both the dof are constrained
 %             dofj = [];

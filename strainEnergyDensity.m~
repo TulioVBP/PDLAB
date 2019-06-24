@@ -1,12 +1,9 @@
-function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history,b_end)
+function W = strainEnergyDensity(x,x_imp,u,theta_i,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
     m = weightedVolume(par_omega);
     horizon = par_omega(1);
-    if ~exist('b_end','var')
-        b_end = false;
-    end
     % Evaluate dilatation
     %if model.dilatation
     %    theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);

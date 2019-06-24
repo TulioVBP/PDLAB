@@ -153,7 +153,7 @@ function [f_i,history_up,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_v
        % Loop on their neighbourhood
        noFail = noFailZone(ii) || noFailZone(jj); % True if node ii or jj is in the no fail zone
        if model.dilatation     
-          [fij,history_up(1,neig_index,:),mu_j] = T(x_imp,u_n,theta,ii,dof_vec,familyMat,partialAreas,XJ,YJ,neig_index,par_omega,c,model,[ ],damage,dt,history(ii,neig_index,:),noFail);
+          [fij,history_up(1,neig_index,:),mu_j] = T(x,x_imp,u_n,theta,ii,dof_vec,familyMat,partialAreas,XJ,YJ,neig_index,par_omega,c,model,[ ],damage,dt,history(ii,neig_index,:),noFail);
        else
           [fij,history_up(1,neig_index,:),mu_j] = T(x_imp,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history(ii,neig_index),noFail);
        end

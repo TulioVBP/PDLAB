@@ -1,6 +1,6 @@
 function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% INPUT
-% x - node position matrix
+% x - node position matrix (changed with quadrature points)
 % u - degree of freedom displacement vector
 % ii - index of the i-th node
 % jj - index of the j-th node inside i's family
