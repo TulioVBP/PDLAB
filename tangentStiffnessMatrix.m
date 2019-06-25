@@ -14,7 +14,21 @@ epsilon_vector = zeros(N,1);
 K = zeros(N,N);
 %% Transverse each node in the discretization
 for ii=1:length(x)
-    transvList = [ii family(ii,family(ii,:)~=0)]; % Node i and all neighbours of node i
+    if model.dilatation % The system has dilatation
+        transvList = [ii family(ii,family(ii,:)~=0)];
+        li = length(transvList);
+        neighIndex = 1;
+        for jj = family(ii,family(ii,:)~=0)
+            for ll = family(jj,family(jj,:)~=0)
+                if ~sum(transvList == ll)
+                    transvList(li+neighIndex) = ll;
+                    neighIndex = neighIndex + 1;
+                end
+            end
+        end
+    else % No dilatation
+        transvList = [ii family(ii,family(ii,:)~=0)]; % Node i and all neighbours of node i
+    end
     for jj= transvList
         %% Evaluate the force state at x1 under perturbations of displacement
         dofj = dof_vec(jj,:);

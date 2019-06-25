@@ -226,7 +226,23 @@ if exist(filename,'file') == 0
                 display(strcat('Generating family..',num2str(iI/N*100),'%'));
             end
         otherwise
-            error("Partial area algorithm not yet implemented")
+             for iI = 1:N
+                x_i = x(iI,:);
+                neigh_index = 1;
+                for iII = 1:N
+                    if iII ~= iI
+                        x_j = x(iII,:);
+                        xi  = x_j - x_i;
+                        norma = norm(xi);
+                    if norma <= horizon
+                            family(iI,neigh_index) = iII;
+                            partialAreas(iI,neigh_index) = h^2;
+                            neigh_index = neigh_index+1;
+                    end
+                    end
+                end
+             end
+%            error("Partial area algorithm not yet implemented")
     end
     %% SAVE
     if find(family(:,columns)~=0)~=0
@@ -254,7 +270,7 @@ end
                     surfaceCorrection(iI,iII) = 1;
             end
         end
-        display(strcat('Generating surface correction..',num2str(iI/N*100),'%'));
+        %display(strcat('Generating surface correction..',num2str(iI/N*100),'%'));
     end
 end
 
