@@ -23,7 +23,7 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
     end
     %% INITIALIZE SIMULATION MATRICES
         if b_parll
-            poolobj = parpool(2);
+            %poolobj = parpool(2);
         end
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
