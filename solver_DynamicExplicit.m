@@ -100,9 +100,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
             if false%horario(4) >= 4 && horario(5) >00
                 filename = strcat('tempsim.mat');
                 save(filename,'x','idb','u_n','phi','energy','n');
-                if b_parll
-                    delete(poolobj);
-                end
+                % if b_parll
+                %     delete(poolobj);
+                % end
                 break;
             end
                 
