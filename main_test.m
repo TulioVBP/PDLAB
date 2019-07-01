@@ -54,7 +54,7 @@ for s_index = 1:length(sigmay)
                 n_tot = length(t);
                 tic
                 [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parallelComp);
-                toc                
+                t_cpu = toc;               
                 filename = strcat('sim_m',int2str(m_vec(m_index)),'_d',num2str(horizon),'.mat');
                 save(filename,'x','idb','u_n','phi','energy','t_cpu');
             case "Quasi-Static"
