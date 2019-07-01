@@ -22,9 +22,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
     %% INITIALIZE SIMULATION MATRICES
-        if b_parll
+        %if b_parll
             %poolobj = parpool(2);
-        end
+        %end
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
         W = zeros(length(x),length(t)); % No initial deformation
@@ -107,9 +107,9 @@ function [u_n,phi,energy] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,fam
             end
                 
         end
-        if b_parll
-            delete(poolobj);
-        end
+        %if b_parll
+            %delete(poolobj);
+        %end
 end
 %%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
