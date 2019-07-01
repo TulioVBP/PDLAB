@@ -1,4 +1,4 @@
-function m_anl = weightedVolume(parameters)
+ function m_anl = weightedVolume(parameters)
 %% Analytical 'm': m is equal inside all the domain, as if it was on the bulk
 % NBL MODEL
 % INPUT : 
