@@ -18,7 +18,7 @@ for n = 1:n_tot
     % Step 3 - Evaluate the residual vector, r, and residual r. Determine the convergence criterion
     %          for the load step.
     epsilon = 10^-4;
-    r_vec = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
+    r_vec = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
     r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf)); % Normalizing the maximum residual
     % Step 4 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
     u_trial = un(:,n);
@@ -30,8 +30,6 @@ for n = 1:n_tot
         while r > r_max
             if ~model.stiffnessAnal 
                 K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage);
-                [~,ev] = eig(K);
-                sum(ev>0);
             else
                 K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage);
             end
@@ -39,7 +37,7 @@ for n = 1:n_tot
             du = -K\r_vec;
             disp('Incremental solution found.')
             u_trial = u_trial + du;
-            r_vec = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
+            r_vec = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage); % Update to include arbitrary displacement kinematic conditions
             r = norm(r_vec,Inf);
             %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
             disp("Current residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
@@ -65,29 +63,30 @@ for n = 1:n_tot
         un(:,n) = u_trial + du;
     end
     % Energy
+    theta = dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,c,model);
     for ii=1:length(x)
        dofi = dof_vec(ii,:);
-       energy.W(ii,n) = strainEnergyDensity(x,un(:,n),family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage)*V;
+       energy.W(ii,n) = strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage)*V;
        energy.EW(ii,n) = dot(bn(dofi),un(dofi,n))*V;
     end
 end
 
 end
 
-function f = getForce(x,u,T,b,familyMat,partialAreas,surfaceCorrection,dof_vec,ndof,bc_set,V,par_omega,c,model,damage)
+function f = getForce(x,u,T,b,familyMat,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage)
 N = length(x);
 f = zeros(size(u));
+% Evaluate dilatation
+if model.dilatation
+    theta = dilatation(x,u,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model);
+end
 for ii = 1:N
     family = familyMat(ii,familyMat(ii,:)~=0); % Neighbours node list
     dofi = dof_vec(ii,:);
-    %u_i = u(dofi)';
     neighIndex = 1;
     for jj = family
-        dofj = dof_vec(jj,:);
-        %u_j = u(dofj)';
-        %[fij,~] = T(x(ii,:),x(jj,:),u_i,u_j,0,[]); % Density vector force
         if model.dilatation
-            [fij,~,~] = T(x,u,ii,dof_vec,familyMat,partialAreas,neighIndex,par_omega,c,model,[],damage);
+            [fij,~,~] = T(x,u,theta,ii,jj,dof_vec,par_omega,c,model,[],damage);
         else
             [fij,~,~] = T(x,u,ii,jj,dof_vec,par_omega,c,model,[],damage);
         end

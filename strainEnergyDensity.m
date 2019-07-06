@@ -1,4 +1,4 @@
-function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history)
+function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history,b_familyEnd)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
@@ -6,10 +6,14 @@ function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,id
     horizon = par_omega(1);
     % Evaluate dilatation
     if model.dilatation
-        theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);
+        %theta_i = dilatation(x,u,family,partialAreas,ii,idb,m,par_omega,c,model);
+        theta_i = theta(ii);
     end
     neigh_ind = 1;
     for jj = familySet
+            if ~exist('b_familyEnd','var')
+                b_familyEnd = (jj == familySet(end));
+            end
             xi = x(jj,:) - x(ii,:);
             dofj = [idb(2*jj-1) idb(2*jj)];
             eta = u(dofj)' - u(dofi)';
@@ -34,7 +38,7 @@ function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,id
                     alfa = c(2);
                     w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
                     W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if jj == familySet(end)
+                    if b_familyEnd
                         W = W + kappa*theta_i^2/2;
                     end
                 case "Lipton Free Damage"
@@ -45,16 +49,18 @@ function W = strainEnergyDensity(x,u,family,partialAreas,surfaceCorrection,ii,id
                     end
                     Slin = dot(xi,eta)/norma^2;
                     V_delta = pi*horizon^2;
-                    W = W+2/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if jj == familySet(end)
-                        W = W/2; % Teste
+                    W = W+1/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
+                    if b_familyEnd
                         W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);
-                    W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-                    if jj == familySet(end)
-                        W = W + c(1)*theta_i^2/2;
+                    nu = c(3);
+                    %W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
+                    W = W + c(2)/2*influenceFunction(norma,par_omega)*elong^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
+                    if b_familyEnd
+                        %W = W + c(1)*theta_i^2/2;
+                        W = W + (c(1)/2 + c(2)*m/3*(1/6 - (nu-1)/(2*(2*nu-1))))*theta_i^2;
                     end
                 otherwise
                     break

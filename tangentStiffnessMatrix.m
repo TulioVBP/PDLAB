@@ -36,13 +36,25 @@ for ii=1:length(x)
             epsilon_vector(rr) = epsilon;
             u_plus = u + epsilon_vector;
             u_minus = u - epsilon_vector;
+            
+            % {Evaluate related dilatation}
+            theta_plus = zeros(length(x),1); theta_minus = zeros(length(x),1);
+            if model.dilatation
+                transvListII = [ii family(ii,family(ii,:)~=0)]; % Transversal list of affected dilatations
+                theta_plus(transvListII) = dilatation(x,u_plus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,c,model);
+                theta_minus(transvListII) = dilatation(x,u_minus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,c,model);
+            end
+            % -- 
+            
             for kk = family(ii,family(ii,:)~=0)
                 dofi = dof_vec(ii,:);
                 %[T_plus,~,~] = T(x(ii,:),x(kk,:),u_plus(dofi)',u_plus(dofk)');
                 if model.dilatation
-                    neigh_Index = find(family(ii,:)==kk);
-                    [T_plus,~,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
-                    [T_minus,~,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
+                    %neigh_Index = find(family(ii,:)==kk);
+                    [T_plus,~,~] = T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+                    [T_minus,~,~] = T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+%                     [T_plus,~,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
+%                     [T_minus,~,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
                 else
                     [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                     [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
