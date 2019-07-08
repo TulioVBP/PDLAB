@@ -1,4 +1,4 @@
-function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,history,b_familyEnd)
+function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,b_familyEnd,historyS,historyT)
     W = 0;
     familySet = family(family~=0);
     dofi = [idb(2*ii-1) idb(2*ii)];
@@ -22,7 +22,8 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             switch model.name
                 case "PMB"
                     if exist('history','var')
-                        mu = damageFactor(history(neigh_ind),x(ii,:),x(jj,:),damage,[],model); % NoFail not required
+                        noFail = damage.noFail(ii) || damage.noFail(jj);
+                        mu = damageFactor(historyS(neigh_ind),x(ii,:),x(jj,:),damage,noFail,model); % NoFail not required
                     else
                         mu = 1;
                     end
@@ -42,8 +43,10 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
                         W = W + kappa*theta_i^2/2;
                     end
                 case "Lipton Free Damage"
-                    if exist('history','var')
-                        H = damageFactor(history(1,neigh_ind,:),x(ii,:),x(jj,:),damage,[],model);
+                    if exist('historyS','var') && exist('historyT','var')
+                        noFail = damage.noFail(ii) || damage.noFail(jj);
+                        XX = [historyS(neigh_ind), historyT(ii),historyT(jj)];
+                        H = damageFactor(XX,x(ii,:),x(jj,:),damage,noFail,model);
                     else
                         H = [1 1 1];
                     end
@@ -52,6 +55,9 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
                     W = W+1/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
                     if b_familyEnd
                         W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
+                    end
+                    if isnan(W)
+                            erro = 1;
                     end
                 case "LPS 2D"
                     elong = norm(xi+eta) - norm(xi);

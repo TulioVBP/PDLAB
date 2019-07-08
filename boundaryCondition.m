@@ -82,4 +82,5 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,t
    xlabel('x (m)'); ylabel('y (m)')
    title('Boundary conditions')
    set(gca,'FontSize',13)
+   pause(1)
 end

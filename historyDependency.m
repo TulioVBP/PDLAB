@@ -5,11 +5,14 @@ function history = historyDependency(x,maxNeigh,model)
 
 switch model.name
     case "PMB"
-        history(:,:,1) = zeros(length(x),maxNeigh); % S_max
+            history.S = zeros(length(x),maxNeigh); % S_max
     case "Lipton Free Damage"
-        history(:,:,1) = zeros(length(x),maxNeigh); % js integral
-        history(:,:,2) = zeros(length(x),maxNeigh); % jtheta-x integral
-        history(:,:,3) = zeros(length(x),maxNeigh); % jtheta-y integral
+            history.S = zeros(length(x),maxNeigh); % js integral
+            history.theta = zeros(length(x),1); % jtheta-x integral
+        %history(:,:,3) = zeros(length(x),maxNeigh); % jtheta-y integral
+    case "LPS 2D"
+            history.S = zeros(length(x),maxNeigh); % js integral
+            history.theta = zeros(length(x),1); % jtheta-x integral
     otherwise
-        history(:,:,1) = zeros(length(x),maxNeigh); % Don't have a meaning
+        history.S = zeros(length(x),maxNeigh); % Don't have a meaning
 end

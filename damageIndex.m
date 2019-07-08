@@ -1,4 +1,4 @@
-function phi = damageIndex(x,u,family,partialAreas,ii,idb,noFailZone)
+function phi = damageIndex(x,u,family,partialAreas,ii,idb,noFailZone,model)
 %% INPUT:
 % - x: nodes position
 % - u: nodes displacement
@@ -36,9 +36,9 @@ function phi = damageIndex(x,u,family,partialAreas,ii,idb,noFailZone)
            norma = norm(xi); 
            S = (norm(eta+xi) - norm(xi))/norma; % Calculate stretch
            noFail = noFailZone(ii) || noFailZone(jj);
-           mu_j = damageFactor(S,x_i,x_j,noFail); % Calculate damage factor
+           mu_j = damageFactor(S,x_i,x_j,noFail,model); % Calculate damage factor
            areaTot = areaTot + partialAreas(familyIndex); % Integration on the area
-           partialDamage = partialDamage + mu_j*partialAreas(familyIndex); % Integration on the partial damage
+           partialDamage = partialDamage + mu_j(1)*partialAreas(familyIndex); % Integration on the partial damage
        else
            break;
        end

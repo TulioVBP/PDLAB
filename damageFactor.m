@@ -23,7 +23,8 @@ function mu = damageFactor(x,x_i,x_j,damage,noFail,model)
             % Bond interceptate the initial crack (notch)
            switch model.name
            case "Lipton Free Damage"
-                mu = [0 0 0];
+                mu = mu_model(x,damage,model); % Temporary
+                mu(1) = 0;
            otherwise              
                 mu = 0;
             end
@@ -76,7 +77,7 @@ switch model.name
     case "Lipton Free Damage"
         %% Ht
         % Evaluating h
-        xc = 0.15;
+        xc = 0.15*10^-6;
         % Evaluating Ht or Hd
         mu(1) = h_function(x(1),xc); % Ht
         mu(2) = h_function(x(2),xc); % Hd-x
@@ -88,7 +89,11 @@ end
 end
 
 function h = h_function(x,xc)
-    h = 1 + heaviside_v2(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + heaviside_v2(x-xc).*(-exp(1-1./(1-(x/xc).^2.01)));
+    if x < xc
+        h = 1 + heaviside_v2(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + heaviside_v2(x-xc).*(-exp(1-1./(1-(x/xc).^2.01)));
+    else
+        h = 0;
+    end
 end
 
 function HH = heaviside_v2(x)
