@@ -1,53 +1,57 @@
-function mu = damageFactor(x,x_i,x_j,damage,noFail,model)
+function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
 %% Input
 % x: stretch, js integral, jtheta integral ...
 % x_i: position of node i
 % x_j: position of node j
 % damage: all needed data
 % noFail: true if one of the nodes is in a non fail zone
-% dt: timestep (not always needed)
+% model: timestep (not always needed)
+% brokenBonds: 
 %% Output
 % mu: damage factor
 %% CODE
     crackSegments = size(damage.crackIn,1); % At least 2
-    check = [];
+    check = zeros(length(neighIndex),crackSegments-1);
+    % {Preallocate the damage factor}
+    if model.dilatation
+        mu = zeros(length(neighIndex),3);
+    else
+        mu = zeros(length(neighIndex),1);
+    end
+    
     if damage.damageOn
         % With damage
-        for ii = 1:crackSegments-1
-            [~,check(ii)] = checkBondCrack(x_i,x_j,damage.crackIn(ii,:),damage.crackIn(ii+1,:));
-        end
-        if ~sum(check)
-            % Bond doesn't interceptate the initial crack (notch)
-            mu = mu_model(x,damage,model);
-        else
-            % Bond interceptate the initial crack (notch)
-           switch model.name
-           case "Lipton Free Damage"
-                mu = mu_model(x,damage,model); % Temporary
-                mu(1) = 0;
+%         for ii = 1:crackSegments-1
+%             for jj = 1:size(x_j,1)
+%             [~,check(jj,ii)] = checkBondCrack(x_i,x_j(jj,:),damage.crackIn(ii,:),damage.crackIn(ii+1,:));
+%             end
+%         end
+%         check = check'; % #crackSegmentsxN
+%         % Bond doesn't interceptate the initial crack (notch)
+%         if isempty(check)
+%            brokenBonds = logical(zeros(size(x_j,1),1));
+%         elseif size(check,1) == 1
+%            brokenBonds = logical(check);
+%         else
+%            brokenBonds = any(check);
+%         end
+%         %brokenBonds = any(check);
+        brokenBonds = damage.brokenBonds(ii,neighIndex);
+        mu(~brokenBonds,:) = mu_model(x(~brokenBonds),damage,model);
+        % Bond interceptate the initial crack (notch)
+        switch model.name
+            case "Lipton Free Damage"
+                mu(brokenBonds,2:3) = mu_model(x,damage,model); % Temporary
+                mu(brokenBonds,1) = zeros(length(brokenBonds),1);
            otherwise              
-                mu = 0;
-            end
+                mu(brokenBonds,:) = zeros(length(brokenBonds(brokenBonds~=0)),size(mu,2));
         end
     else
         % No damage
-        switch model.name
-            case "Lipton Free Damage"
-                mu = [1 1 1];
-            otherwise              
-                mu = 1;
-        end
+        mu = ones(size(mu));
     end
-    if exist('noFail','var')~=0
-        if noFail == true
-            % No damage
-            switch model.name
-                case "Lipton Free Damage"
-                    mu = [1 1 1];
-                otherwise              
-                    mu = 1;
-            end
-        end
+    if ~isempty(noFail)%exist('noFail','var')~=0
+        mu(noFail,:) = ones(size(mu(noFail,:)));
     end
 end
 
@@ -66,14 +70,14 @@ switch model.name
         end
         S0 = [-0.98 0.95*Sc]; % S0- and S0+
         S1 = [-0.99 1.05*Sc]; % S1- and S1+
-        if x < S0(2) && x > -1
-            mu = 1;
-        elseif x > S0(2) && x < S1(2)
-            mu = (S1(2) - x)/(S1(2) - S0(2));
-        else
-            mu = 0;
-        end
-           
+%         if x < S0(2) && x > -1
+%             mu = 1;
+%         elseif x > S0(2) && x < S1(2)
+%             mu = (S1(2) - x)/(S1(2) - S0(2));
+%         else
+%             mu = 0;
+%         end
+        mu = (x<= S0(2)).*(x>=-1).*1 + (x > S0(2)).*(x<S1(2)).*(S1(2) - x)/(S1(2) - S0(2));
     case "Lipton Free Damage"
         %% Ht
         % Evaluating h

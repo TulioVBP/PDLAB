@@ -16,33 +16,30 @@ function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,mod
 %% CODE
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
-    u_i = u(dofi)'; u_j = u(dofj)';
+    u = u'; % Nx1 -> 1xN
+    u_i = u(dofi); u_j = u(dofj);
     xi = x_j - x_i; % \xi
     eta = u_j - u_i; % \eta
-    norma = norm(xi); 
-    S = (norm(eta+xi) - norma)/norma; % Calculate stretch
-    ee = (eta + xi)/norm(eta+xi); % Versor
+    norma = vecnorm(xi')'; 
+    S = (vecnorm(eta'+xi')' - norma)./norma; % Calculate stretch
+    ee = (eta + xi)./vecnorm(eta'+xi')'; % Versor
     % Updating maximum stretch
-    if exist('history','var') ~=0
-        if S > history
-            history = S;
-        end
+    %if exist('history','var') ~=0
+    if nargin > 10  && damage.damageOn% Damage considered
+        S_max = history';
+        history(S>S_max) = S(S>S_max);
         S_max = history;
-    else
-        S_max = S;
+        % Evaluating the damage factor
+        mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
+    else % No damage considered
         history = S;
-    end
-    % Defining non-existing parameters
-    if ~exist('noFail','var')
-        noFail = 0;
+        mu = ones(length(S),1);
     end
     % Evaluating the force interaction
-    mu = damageFactor(S_max,x_i,x_j,damage,noFail,model); % If noFail is true then we will always have mu as one
-
-    f = c(1)*influenceFunction(norma,par_omega)*norma*fscalar(S*mu,damage)*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
+    f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S.*mu,damage,noFail).*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
 end
 
-function ff = fscalar(x,damage)
+function ff = fscalar(x,damage,noFail)
 %%
 %global S0 S1 damageOn
 if damage.damageOn
@@ -55,16 +52,21 @@ if damage.damageOn
     end
     S0 = [-0.98 0.95*Sc]; % S0- and S0+
     S1 = [-0.99 1.05*Sc]; % S1- and S1+
-    % Evaluation
-    if x > S1(1) && x < S0(1) % (S1-,S0-)
-      ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
-    elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]
-      ff = x;
-    elseif x > S0(2) && x < S1(2) % (S0+,S1) 
-      ff = S0(2)*(S1(2)-x)/(S1(2) - S0(2));
-    else
-      ff = 0;
-    end
+%     % Evaluation
+%     if x > S1(1) && x < S0(1) % (S1-,S0-)
+%       ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
+%     elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]
+%       ff = x;
+%     elseif x > S0(2) && x < S1(2) % (S0+,S1) 
+%       ff = S0(2)*(S1(2)-x)/(S1(2) - S0(2));
+%     else
+%       ff = 0;
+%     end
+    % NEW FORMULATION
+    ff = (x>S1(1)).*(x<S0(1)).*(S0(1)*(x-S1(1))./(S0(1) - S1(1))) + (x>=S0(1)).*(x<=S0(2)).*x ...
+        + (x>S0(2)).*(x<S1(2)).*(S0(2)*(S1(2)-x)./(S1(2)-S0(2)));
+    % Adding noFail condition
+    ff(noFail) = x(noFail);
 else
     ff = x;
 end
