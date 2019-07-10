@@ -26,41 +26,47 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x(jj,:) - x(ii,:); % \xi
-    u_i = u(dofi)'; u_j = u(dofj)';
+    u = u';
+    u_i = u(dofi); u_j = u(dofj);
     eta = u_j - u_i; % \eta
-    norma = norm(xi); 
-    S = dot(eta,xi)/norma^2; % Calculate stretch - linear
-    ee = (xi)/norma; % Versor
+    norma = vecnorm(xi')'; 
+    S = dot(eta',xi')'./norma.^2; % Calculate stretch - linear
+    ee = (xi)./norma; % Versor
     % Defining non-existing parameters
-    if ~exist('noFail','var')
-        noFail = 0;
-    end
-    if ~exist('historyS','var')
-        historyS = 0;
-    end
-    if ~exist('historyTheta','var')
-        historyTheta = zeros(length(x),1);
-    end
-    if ~exist('dt','var')
-       dt = 0; 
+%     if ~exist('noFail','var')
+%         noFail = 0;
+%     end
+%     if ~exist('historyS','var')
+%         historyS = 0;
+%     end
+%     if ~exist('historyTheta','var')
+%         historyTheta = zeros(length(x),1);
+%     end
+%     if ~exist('dt','var')
+%        dt = 0; 
+%     end
+    if nargin > 10  && damage.damageOn% Damage considered
+        % ---- Evaluating the damage factor Ht
+        % . Evaluating js
+        history_upS = historyS + js(S,damage.Sc)*dt; % NX1
+        XX = [history_upS, historyTheta(ii)*ones(1,length(historyTheta(jj))), historyTheta(jj)]; 
+        H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
+    else
+        history_upS = 0;
+        H = ones(length(jj),3);
     end
     %% Evaluating the force interaction
     V_delta = pi*horizon^2; % Not sure if this is the right expression
-    % ---- Evaluating the damage factor Ht
-    % . Evaluating js
-    history_upS = historyS + js(S,damage.Sc)*dt;
     
     % -- Evaluating the dilatation
     % Dilatation term
     theta_i = theta(ii); theta_j = theta(jj);
     
-    XX = [history_upS, historyTheta(ii), historyTheta(jj)];
-    H = damageFactor(XX,x_i,x_j,damage,noFail,model);
-    Ht = H(1); Hd_x = H(2); Hd_y = H(3);
+    Ht = H(:,1); Hd_x = H(:,1); Hd_y = H(:,3);
     % Tensile term Lt
-    ft = 2/V_delta*influenceFunction(norma,par_omega)/horizon*Ht*fscalar(sqrt(norma)*S,norma,c,damage.damageOn)*ee;
+    ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,c,damage.damageOn).*ee;
     % Dilatation term Ld
-    fd = 1/V_delta*influenceFunction(norma,par_omega)/horizon^2*norma*(Hd_y*gscalar(theta_j,c,damage.damageOn) + Hd_x*gscalar(theta_i,c,damage.damageOn))*ee;
+    fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*(Hd_y.*gscalar(theta_j,c,damage.damageOn) + Hd_x.*gscalar(theta_i,c,damage.damageOn)).*ee;
     % Final force
     f = fd + ft;
     mu = Ht; % Check for damage in this model
@@ -70,13 +76,15 @@ function ff = fscalar(x,norma,c,damageOn)
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
-    if x*sqrt(norma) <= r1
-        ff = c(1)*x*sqrt(norma);
-    elseif x*sqrt(norma) > r2
-        ff = sqrt(norma);
-    end
+%     if x*sqrt(norma) <= r1
+%         ff = c(1)*x*sqrt(norma);
+%     elseif x*sqrt(norma) > r2
+%         ff = sqrt(norma);
+%     end
+    ff = (x.*sqrt(norma) <= r1).*c(1)*x.*sqrt(norma)...
+        + (x.*sqrt(norma) > r2).*sqrt(norma);
 else
-    ff = c(1)*x*sqrt(norma);
+    ff = c(1)*x.*sqrt(norma);
 end
 end
 
@@ -84,11 +92,12 @@ function gg = gscalar(x,c,damageOn)
 r1 = 3.0;
 r2 = 3.0;
 if damageOn
-    if x <= r1
-        gg = c(2)*x;
-    elseif x > r2
-        gg = 1;
-    end
+%     if x <= r1
+%         gg = c(2)*x;
+%     elseif x > r2
+%         gg = 1;
+%     end
+    gg = (x<=r1).*c(2)*x + (x>2)*1;
 else
     gg = c(2)*x;
 end

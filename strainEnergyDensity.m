@@ -21,7 +21,7 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
         case "PMB"
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
-                mu = damageFactor(historyS(neigh_ind),ii,neigh_ind,damage,noFail,model); % NoFail not required
+                mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
                 p = antiderivative(s,damage,noFail);
             else
                 mu = ones(length(jj),1);
@@ -30,9 +30,9 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         case "Linearized LPS bond-based"
-            extension = dot(eta,xi)/norma;
-            w = 1/2*c(1)*influenceFunction(norma,par_omega)*extension^2/2;
-            W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
+            extension = dot(eta',xi')'./norma;
+            w = 1/2*c(1)*influenceFunction(norma,par_omega).*extension.^2/2;
+            W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         case "Linearized LPS"
             kappa = c(1)*m/2+c(2)*m/3;
             alfa = c(2);
@@ -42,22 +42,23 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
                 W = W + kappa*theta_i^2/2;
             end
         case "Lipton Free Damage"
-            if exist('historyS','var') && exist('historyT','var')
-                noFail = damage.noFail(ii) || damage.noFail(jj);
-                XX = [historyS(neigh_ind), historyT(ii),historyT(jj)];
-                H = damageFactor(XX,x(ii,:),x(jj,:),damage,noFail,model);
+            if nargin > 11 && damage.damageOn
+                noFail = damage.noFail(ii) | damage.noFail(jj);
+                XX = [historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)];
+                H = damageFactor(XX,ii,neigh_ind,damage,noFail,model);
             else
-                H = [1 1 1];
+                H = ones(length(jj),3);
             end
-            Slin = dot(xi,eta)/norma^2;
+            Slin = dot(xi',eta')'./norma.^2;
             V_delta = pi*horizon^2;
-            W = W+1/V_delta*(influenceFunction(norma,par_omega)*norma/horizon * H(1)*f_potential(Slin*sqrt(norma),c,damage))*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-            if b_familyEnd
-                W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
-            end
-            if isnan(W)
-                    erro = 1;
-            end
+            w = 1/V_delta*(influenceFunction(norma,par_omega).*norma/horizon.*H(:,1).*f_potential(Slin.*sqrt(norma),c,damage));
+            W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)') + 1/horizon^2*H(1,2)*g_potential(theta_i,c,damage);
+%             if b_familyEnd
+%                 W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
+%             end
+%             if isnan(W)
+%                     erro = 1;
+%             end
         case "LPS 2D"
             elong = norm(xi+eta) - norm(xi);
             nu = c(3);
@@ -93,18 +94,6 @@ function p = antiderivative(x,damage,noFail)
             S0(2)^2/2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
             S0(2)/(S1(2) - S0(2))*S1(2)^2/2];
         C = A\b;
-        % {Evaluate p}
-%         if x <  S1(1)
-%             p = C(4); % C4
-%         elseif x < S0(1)
-%             p = S0(1)/(S0(1) - S1(1))*(x^2/2 - S1(1)*x) + C(1);
-%         elseif x < S0(2)
-%             p = x^2/2 + C(2);
-%         elseif x < S1(2)
-%             p = S0(2)/(S1(2) - S0(2))*(S1(2)*x - x^2/2) + C(3);
-%         else
-%             p = C(5);
-%         end
         p = (x<=S1(1)).* C(4) + (x<=S0(1)).*(x>S1(1)).*(S0(1)/(S0(1) - S1(1)).*(x.^2/2 - S1(1)*x) + C(1)) ...
             + (x<=S0(2)).*(x>S0(1)).*(x.^2/2 + C(2)) + (x<=S1(2)).*(x>S0(2)).*(S0(2)/(S1(2) - S0(2)).*(S1(2)*x - x.^2/2) + C(3)) ...
             + (x>S1(2)).*C(5);
@@ -148,13 +137,9 @@ function ff = f_potential(x,c,damage)
 r1 = 3.0;
 r2 = 3.0;
 if damage.damageOn
-    if x <= r1
-        ff = c(1)*x^2/2;
-    elseif x > r2
-        ff = x;
-    end
+    ff = (x <= r1).*c(1).*x.^2/2 + (x > r2).*x;
 else
-    ff = c(1)*x^2/2;
+    ff = c(1)*x.^2/2;
 end
 end
 

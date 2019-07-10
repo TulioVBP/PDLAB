@@ -32,7 +32,21 @@ else
 end
 %% Checking for family file
 filename = strcat('family',int2str(option),'.mat');
-if exist(filename,'file') == 0
+if exist(filename,'file')
+    columns = (2*ceil(d) + 1)^2;
+    load(filename);
+    colFile = size(family,2);
+    existence = true;
+    if colFile ~= columns || length(x) ~= size(family,1)
+        disp('Corresponding family file is not corresponding to the current mesh. Erasing it and generating a new one.')
+        existence = false;
+    else
+        cd ../
+    end
+else
+    existence = false;
+end
+if ~existence
     N = size(x,1);
     lengthx = max(x(:,1)) - min(x(:,1));
     lengthy = max(x(:,2)) - min(x(:,2));
@@ -250,9 +264,6 @@ if exist(filename,'file') == 0
     else
         save(filename,'family','partialAreas','maxNeigh')
     end
-    cd ../
-else
-    load(filename)
     cd ../
 end
 %% Surface correction algorithm

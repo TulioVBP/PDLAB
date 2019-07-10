@@ -18,32 +18,30 @@ function [f,history,mu] = interactionForce_LLPSBB(x,u,ii,jj,dof_vec,par_omega,c,
     x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x_j - x_i; % \xi
-    u_i = u(dofi)'; u_j = u(dofj)';
+    u = u';
+    u_i = u(dofi); u_j = u(dofj);
     eta = u_j - u_i; % \eta
-    norma = norm(xi); 
-    S = dot(eta,xi)/norma^2; % Calculate stretch - linear
-    ee = xi/norma; % Versor
+    norma = vecnorm(xi')';
+    %xi_rep = repmat(xi,size(x_j,1),1);
+    S = dot(eta',xi')'./norma.^2; % Calculate stretch - linear
+    ee = xi./norma; % Versor
     % Updating maximum stretch
-    if exist('history','var') ~=0
-        if S > history
-            history = S;
-        end
+    if nargin > 10  && damage.damageOn% Damage considered
+        S_max = history';
+        history(S>S_max) = S(S>S_max);
         S_max = history;
-    else
-        S_max = S;
-        history = S;
+        % Evaluating the damage factor
+        mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
+    else % No damage considered
+        history = zeros(length(S),1);
+        mu = ones(length(S),1);
+        noFail = [];
     end
-    % Evaluating the force interaction
-    if exist('noFail','var') == 0
-        noFail = 1;
-    end
-    if ~exist('damage','var')
-        damage.damageOn = false;
-        damage.crackIn = [];
-    end
-    f = c(1)*influenceFunction(norma,par_omega)*fscalar(eta,ee,S,damage)*ee;
-    history = 0; % For this specific model
-    mu = 1; % No damage in this model
+%     if ~exist('damage','var')
+%         damage.damageOn = false;
+%         damage.crackIn = [];
+%     end
+    f = c(1)*influenceFunction(norma,par_omega).*fscalar(eta,ee,S,damage).*ee;
 end
 
 function ff = fscalar(eta,versor,x,damage)
@@ -51,12 +49,9 @@ function ff = fscalar(eta,versor,x,damage)
 % versor: direction of the force
 % x: stretch
 if damage.damageOn
-     if x < damage.S0(2)
-        ff = dot(eta,versor);
-     else
-        ff = 0;
-     end
+        %versor_rep = repmat(versor,size(eta,1),1);
+        ff = (x < damage.S0(2)).*dot(eta',versor')';
 else
-    ff = dot(eta,versor);
+    ff = dot(eta',versor')';
 end
 end

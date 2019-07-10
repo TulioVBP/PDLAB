@@ -28,12 +28,13 @@ function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,mod
     if nargin > 10  && damage.damageOn% Damage considered
         S_max = history';
         history(S>S_max) = S(S>S_max);
-        S_max = history;
+        S_max = history';
         % Evaluating the damage factor
         mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
     else % No damage considered
         history = S;
         mu = ones(length(S),1);
+        noFail = [];
     end
     % Evaluating the force interaction
     f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S.*mu,damage,noFail).*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
@@ -52,16 +53,7 @@ if damage.damageOn
     end
     S0 = [-0.98 0.95*Sc]; % S0- and S0+
     S1 = [-0.99 1.05*Sc]; % S1- and S1+
-%     % Evaluation
-%     if x > S1(1) && x < S0(1) % (S1-,S0-)
-%       ff = S0(1)*(x-S1(1))/(S0(1) - S1(1));  
-%     elseif x >= S0(1) && x <= S0(2) % [S0-,S0+]
-%       ff = x;
-%     elseif x > S0(2) && x < S1(2) % (S0+,S1) 
-%       ff = S0(2)*(S1(2)-x)/(S1(2) - S0(2));
-%     else
-%       ff = 0;
-%     end
+
     % NEW FORMULATION
     ff = (x>S1(1)).*(x<S0(1)).*(S0(1)*(x-S1(1))./(S0(1) - S1(1))) + (x>=S0(1)).*(x<=S0(2)).*x ...
         + (x>S0(2)).*(x<S1(2)).*(S0(2)*(S1(2)-x)./(S1(2)-S0(2)));
