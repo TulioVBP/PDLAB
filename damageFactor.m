@@ -23,12 +23,12 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
         brokenBonds = damage.brokenBonds(ii,neighIndex);
         mu = mu_model(x,damage,model);
         if any(brokenBonds)  % Bond interceptate the initial crack (notch)
-        switch model.name
-            case "Lipton Free Damage"
-                mu(brokenBonds,1) = zeros(length(brokenBonds),1);
-           otherwise              
-                mu(brokenBonds,:) = zeros(length(brokenBonds(brokenBonds~=0)),size(mu,2));
-        end
+            switch model.name
+                case "Lipton Free Damage"
+                    mu(brokenBonds,1) = zeros(sum(brokenBonds),1);
+               otherwise              
+                    mu(brokenBonds,:) = zeros(sum(brokenBonds),size(mu,2));
+            end
         end
     else
         % No damage
@@ -67,9 +67,9 @@ switch model.name
         % Evaluating h
         xc = 0.15*10^-6;
         % Evaluating Ht or Hd
-        mu(1,:) = h_function(x(1,:),xc); % Ht
-        mu(2,:) = h_function(x(2,:),xc); % Hd-x
-        mu(3) = h_function(x(3,:),xc); % Hd-y        
+        mu(:,1) = h_function(x(:,1),xc); % Ht
+        mu(:,2) = h_function(x(:,2),xc); % Hd-x
+        mu(:,3) = h_function(x(:,3),xc); % Hd-y        
     otherwise
         mu = 1;
 end
@@ -78,12 +78,11 @@ end
 
 function h = h_function(x,xc)
 %     if x < xc
-        h = (x<xc).*(1 + heaviside_v2(x).*(exp(1-1./(1-(x/xc).^2.01)) - 1) + heaviside_v2(x-xc).*(-exp(1-1./(1-(x/xc).^2.01))));
+        h = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
+        if any(isnan(h))
+           h(isnan(h)) = zeros(sum(isnan(h)),1);
+        end
 %     else
 %         h = 0;
 %     end
-end
-
-function HH = heaviside_v2(x)
-    HH = x >= 0; % Heaviside function
 end

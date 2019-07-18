@@ -48,8 +48,8 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
     if nargin > 10  && damage.damageOn% Damage considered
         % ---- Evaluating the damage factor Ht
         % . Evaluating js
-        history_upS = historyS + js(S,damage.Sc)*dt; % NX1
-        XX = [history_upS, historyTheta(ii)*ones(1,length(historyTheta(jj))), historyTheta(jj)]; 
+        history_upS = historyS' + js(S,damage.Sc)*dt; % NX1
+        XX = [history_upS, historyTheta(ii)*ones(length(historyTheta(jj)),1), historyTheta(jj)]; 
         H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
     else
         history_upS = 0;
@@ -62,7 +62,7 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
     % Dilatation term
     theta_i = theta(ii); theta_j = theta(jj);
     
-    Ht = H(:,1); Hd_x = H(:,1); Hd_y = H(:,3);
+    Ht = H(:,1); Hd_x = H(1,2); Hd_y = H(1,3);
     % Tensile term Lt
     ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,c,damage.damageOn).*ee;
     % Dilatation term Ld
@@ -81,7 +81,7 @@ if damageOn
 %     elseif x*sqrt(norma) > r2
 %         ff = sqrt(norma);
 %     end
-    ff = (x.*sqrt(norma) <= r1).*c(1)*x.*sqrt(norma)...
+    ff = (x.*sqrt(norma) <= r1).*c(1).*x.*sqrt(norma)...
         + (x.*sqrt(norma) > r2).*sqrt(norma);
 else
     ff = c(1)*x.*sqrt(norma);
@@ -97,7 +97,7 @@ if damageOn
 %     elseif x > r2
 %         gg = 1;
 %     end
-    gg = (x<=r1).*c(2)*x + (x>2)*1;
+    gg = (x<=r1).*c(2).*x + (x>2)*1;
 else
     gg = c(2)*x;
 end

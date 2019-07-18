@@ -147,11 +147,7 @@ function gg = g_potential(x,c,damage)
 r1 = 3.0;
 r2 = 3.0;
 if damage.damageOn
-    if x <= r1
-        gg = c(2)*x^2/2;
-    elseif x > r2
-        gg = x;
-    end
+    gg = (x <= r1).*c(2).*x.^2/2 + (x > r2).*x;
 else
     gg = c(2)*x^2/2;
 end

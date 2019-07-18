@@ -96,11 +96,11 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             if model.dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_tempT(ii)] = dilatation(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,history_tempT(ii),dt);
+                        [theta(ii),history_tempT(ii)] = dilatation(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history_tempT(ii),dt);
                         %[theta(ii)] = dilatation(x,u_n(:,n+1),familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model);
                     end
                 else
-                    [theta,history_tempT] = dilatation(x,u_n(:,n+1),familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,history.theta,dt);
+                    [theta,history_tempT] = dilatation(x,u_n(:,n+1),familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history.theta,dt);
                     %[theta] = dilatation(x,u_n(:,n+1),familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model);
                 end
                 history.theta = history_tempT; % Assigning up-to-date history variable

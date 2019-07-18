@@ -1,4 +1,4 @@
-function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,c,model,history_theta,dt)
+function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,c,model,damage,history_theta,dt)
     horizon = par_omega(1);
     thetac_p = 0.01; % For Lipton's damage
     thetac_m = 0.01; % For Lipton's damage
@@ -31,7 +31,8 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                     V_delta = pi*horizon^2;
                     S_linear = dot(xi',eta')'./norma.^2;
                     theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                    theta(transv_ind) = sum(theta_vec);                
+                    %wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
+                    theta(transv_ind) = sum(theta_vec);%;.*wholeBonds);
                 case "LPS 2D"
                     nu = c(3);
                     elong = vecnorm(xi'+eta')' - vecnorm(xi')';
