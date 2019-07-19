@@ -46,27 +46,24 @@ for ii=1:length(x)
             end
             % -- 
             
-            for kk = family(ii,family(ii,:)~=0)
+            %for kk = family(ii,family(ii,:)~=0)
+                kk = family(ii,family(ii,:)~=0);
+                neigh_index = 1:length(kk);
                 dofi = dof_vec(ii,:);
-                %[T_plus,~,~] = T(x(ii,:),x(kk,:),u_plus(dofi)',u_plus(dofk)');
                 if model.dilatation
-                    %neigh_Index = find(family(ii,:)==kk);
                     [T_plus,~,~] = T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                     [T_minus,~,~] = T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
-%                     [T_plus,~,~] = T(x,u_plus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
-%                     [T_minus,~,~] = T(x,u_minus,ii,dof_vec,family,partialAreas,neigh_Index,par_omega,c,model,[],damage);
                 else
                     [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                     [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
                 end
-                %[T_minus,~,~] = T(x(ii,:),x(kk,:),u_minus(dofi)',u_minus(dofk)');
-                f_plus = T_plus*partialAreas(ii,family(ii,:)==kk)*surfaceCorrection(ii,family(ii,:)==kk)*h^2; % S_max set to zero
-                f_minus = T_minus*partialAreas(ii,family(ii,:)==kk)*surfaceCorrection(ii,family(ii,:)==kk)*h^2; % S_max set to zero again
-                f_diff = f_plus - f_minus;
+                f_plus = T_plus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero
+                f_minus = T_minus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero again
+                f_diff = sum(f_plus - f_minus);
                 %for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
-                    K(dofi,rr) = K(dofi,rr) + f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
+                    K(dofi,rr) = f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
                 %end
-            end
+            %end
             epsilon_vector(rr) = 0; % Resetting to zero
         end
     end

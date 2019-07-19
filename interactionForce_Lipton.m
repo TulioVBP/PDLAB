@@ -31,19 +31,6 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
     norma = vecnorm(xi')'; 
     S = dot(eta',xi')'./norma.^2; % Calculate stretch - linear
     ee = (xi)./norma; % Versor
-    % Defining non-existing parameters
-%     if ~exist('noFail','var')
-%         noFail = 0;
-%     end
-%     if ~exist('historyS','var')
-%         historyS = 0;
-%     end
-%     if ~exist('historyTheta','var')
-%         historyTheta = zeros(length(x),1);
-%     end
-%     if ~exist('dt','var')
-%        dt = 0; 
-%     end
     if nargin > 10  && damage.damageOn% Damage considered
         % ---- Evaluating the damage factor Ht
         % . Evaluating js
@@ -63,23 +50,18 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
     
     Ht = H(:,1); Hd_x = H(1,2); Hd_y = H(1,3);
     % Tensile term Lt
-    ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,c,damage.damageOn).*ee;
+    ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,c,damage.damageOn,damage.Sc).*ee;
     % Dilatation term Ld
-    fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*(Hd_y.*gscalar(theta_j,c,damage.damageOn) + Hd_x.*gscalar(theta_i,c,damage.damageOn)).*ee;
+    fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*(Hd_y.*gscalar(theta_j,c,damage.damageOn,damage.thetaC) + Hd_x.*gscalar(theta_i,c,damage.damageOn,damage.thetaC)).*ee;
     % Final force
     f = fd + ft;
     mu = Ht; % Check for damage in this model
 end
 
-function ff = fscalar(x,norma,c,damageOn)
-r1 = 3.0;
-r2 = 3.0;
+function ff = fscalar(x,norma,c,damageOn,Sc)
+r1 = Sc*sqrt(norma);
+r2 = r1;
 if damageOn
-%     if x*sqrt(norma) <= r1
-%         ff = c(1)*x*sqrt(norma);
-%     elseif x*sqrt(norma) > r2
-%         ff = sqrt(norma);
-%     end
     ff = (x.*sqrt(norma) <= r1).*c(1).*x.*sqrt(norma)...
         + (x.*sqrt(norma) > r2).*sqrt(norma);
 else
@@ -87,15 +69,10 @@ else
 end
 end
 
-function gg = gscalar(x,c,damageOn)
-r1 = 3.0;
-r2 = 3.0;
+function gg = gscalar(x,c,damageOn,thetaC)
+r1 = thetaC;
+r2 = r1;
 if damageOn
-%     if x <= r1
-%         gg = c(2)*x;
-%     elseif x > r2
-%         gg = 1;
-%     end
     gg = (x<=r1).*c(2).*x + (x>2)*1;
 else
     gg = c(2)*x;

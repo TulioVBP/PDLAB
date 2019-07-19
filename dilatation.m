@@ -1,4 +1,4 @@
-function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,c,model,damage,history_theta,dt)
+function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,c,model,damage,history,dt)
     horizon = par_omega(1);
     thetac_p = 0.01; % For Lipton's damage
     thetac_m = 0.01; % For Lipton's damage
@@ -6,8 +6,8 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
     if isempty(transvList) % Not a specific range of nodes was chosen
        transvList = 1:length(x);
     end
-    if exist('history_theta','var')
-        history_thetaUp = history_theta;
+    if exist('history','var')
+        history_thetaUp = history.theta;
     else
         history_thetaUp = [];
     end
@@ -24,16 +24,19 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
         norma = vecnorm(xi')';
         eta = u(dofj)-u(dofi);
             switch model.number            
-                case 6%"Linearized LPS"
-                    theta_vec = 3/m*influenceFunction(norma,par_omega).*dot(eta',xi')'.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                    theta(transv_ind) = sum(theta_vec);
                 case 3 %"Lipton Free Damage"
                     V_delta = pi*horizon^2;
                     S_linear = dot(xi',eta')'./norma.^2;
                     theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                     if nargin > 10
                         wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
-                        theta(transv_ind) = sum(theta_vec.*wholeBonds);
+                        historyS = history.S(ii,neigh_ind);
+                        history_upS = historyS' + js(S_linear,damage.Sc)*dt;
+                        XX = [history_upS, history.theta(ii)*ones(length(history.theta(jj)),1), history.theta(jj)]; 
+                        noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+                        H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
+                        %theta(transv_ind) = sum(theta_vec.*wholeBonds);%H(:,1));
+                        theta(transv_ind) = sum(theta_vec.*H(:,1)); % Tulio's model
                     else
                         theta(transv_ind) = sum(theta_vec);
                     end
@@ -41,7 +44,10 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                     nu = c(3);
                     elong = vecnorm(xi'+eta')' - vecnorm(xi')';
                     theta_vec = 2*(2*nu-1)/(nu-1)/m*influenceFunction(norma,par_omega).*norma.*elong.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                    theta(transv_ind) = sum(theta_vec);    
+                    theta(transv_ind) = sum(theta_vec);
+                case 6%"Linearized LPS"
+                    theta_vec = 3/m*influenceFunction(norma,par_omega).*dot(eta',xi')'.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
+                    theta(transv_ind) = sum(theta_vec);
                 otherwise
                     break;
             end
@@ -54,4 +60,8 @@ end
 
 function jj = jth(x,thetac_p,thetac_m)
     jj = (x >= thetac_p).*(x/thetac_p-1).^4./(1+(x/thetac_p).^5) + (x <= -thetac_m).*(-x/thetac_m-1).^4./(1+(-x/thetac_m).^5); % If x < Sc, then js = 0;
+end
+
+function jj = js(x,Sc)
+    jj = (x >= Sc).*(x/Sc-1).^2./(1+(x/Sc).^2); % If x < Sc, then js = 0;
 end

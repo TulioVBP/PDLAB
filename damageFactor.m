@@ -41,6 +41,15 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
                xc = 0.15*10^-6;
                mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
                mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
+            case 5 % "PMB"
+                % Damage dependent crack
+                alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+                if damage.phi > alfa
+                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+                else
+                    Sc = damage.Sc;
+                end
+                mu = (x<Sc) * 1;
             otherwise
                 mu = 1;
         end
@@ -66,9 +75,9 @@ function mu = mu_model(x,damage,model)
 % x - Stretch
 
 switch model.number
-    case 1 %"PMB"
+    case 1 %"PMB-DTT"
         % Damage dependent crack
-        alfa = 0.2; beta = 0.2; gamma = 1.4;
+        alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
         if damage.phi > alfa
             Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
         else
@@ -82,12 +91,17 @@ switch model.number
         % Evaluating h
         xc = 0.15*10^-6;
         % Evaluating Ht or Hd
-%         mu(:,1) = h_function(x(:,1),xc); % Ht
-%         mu(:,2) = h_function(x(:,2),xc); % Hd-x
-%         mu(:,3) = h_function(x(:,3),xc); % Hd-y     
-       %
        mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
        mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
+    case 5 % "PMB"
+        % Damage dependent crack
+        alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+        if damage.phi > alfa
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+        else
+            Sc = damage.Sc;
+        end
+        mu = (x<Sc) * 1;
     otherwise
         mu = 1;
 end

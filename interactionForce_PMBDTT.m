@@ -1,4 +1,4 @@
-function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
+function [f,history,mu] = interactionForce_PMBDTT(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
 %% INPUT
 % x - node position matrix
 % u - degree of freedom displacement vector
@@ -51,9 +51,13 @@ if damage.damageOn
     else
         Sc = damage.Sc;
     end
-    
+    S0 = [-0.98 0.95*Sc]; % S0- and S0+
+    S1 = [-0.99 1.05*Sc]; % S1- and S1+
+
     % NEW FORMULATION
-    ff = (x<Sc).*x;
+    ff = (x>S1(1)).*(x<S0(1)).*(S0(1)*(x-S1(1))./(S0(1) - S1(1))) + (x>=S0(1)).*(x<=S0(2)).*x ...
+        + (x>S0(2)).*(x<S1(2)).*(S0(2)*(S1(2)-x)./(S1(2)-S0(2)));
+    % Adding noFail condition
     ff(noFail) = x(noFail);
 else
     ff = x;

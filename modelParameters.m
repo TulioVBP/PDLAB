@@ -1,6 +1,6 @@
 function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
     switch model.name
-    case "PMB"
+    case "PMB DTT"
         alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
         mm = weightedVolume(par_omega);
         horizon = par_omega(1);
@@ -36,9 +36,8 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         c(2) = -2*(-1 + 3*nu)/(-1 + nu^2)*(pi*horizon^3/mm)^2*E*1e6;
         mu = E*1e6/(2*(1+nu));
         lambda = E*1e6*nu/(1+nu)/(1-2*nu);
-        %c(1) = 96*mu;
-        %c(2) = (lambda - mu)*2*12^2;
-        %c(2) = 0;
+        damage.Sc = sqrt(5*(1+nu)*pi*G0/12/(E*1e6)/horizon);
+        damage.thetaC = 3;
         T = @interactionForce_Lipton;
         model.linearity = true;
         model.stiffnessAnal = false;
@@ -56,6 +55,24 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.stiffnessAnal = false;
         model.dilatation = true;
         model.number = 4;
+        
+        case "PMB"
+        alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
+        mm = weightedVolume(par_omega);
+        horizon = par_omega(1);
+        c(1) = 6*E*1e6/mm;
+        T = @interactionForce_PMB;
+        model.linearity = false;
+        model.stiffnessAnal = false;
+        model.dilatation = false;
+        damage.Sc = sqrt(5*pi*G0/9/(E*1e6)/horizon);
+        model.number = 5;
+        % Damage dependent Sc
+        if true
+            damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
+        else
+            damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
+        end
         otherwise
         error("Chosen model is not implemented or it was mistyped");
 end
