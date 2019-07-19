@@ -23,17 +23,21 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
         xi = x(jj,:)-x(ii,:);
         norma = vecnorm(xi')';
         eta = u(dofj)-u(dofi);
-            switch model.name            
-                case "Linearized LPS"
+            switch model.number            
+                case 6%"Linearized LPS"
                     theta_vec = 3/m*influenceFunction(norma,par_omega).*dot(eta',xi')'.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                     theta(transv_ind) = sum(theta_vec);
-                case "Lipton Free Damage"
+                case 3 %"Lipton Free Damage"
                     V_delta = pi*horizon^2;
                     S_linear = dot(xi',eta')'./norma.^2;
                     theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                    %wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
-                    theta(transv_ind) = sum(theta_vec);%;.*wholeBonds);
-                case "LPS 2D"
+                    if nargin > 10
+                        wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
+                        theta(transv_ind) = sum(theta_vec.*wholeBonds);
+                    else
+                        theta(transv_ind) = sum(theta_vec);
+                    end
+                case 4 %"LPS 2D"
                     nu = c(3);
                     elong = vecnorm(xi'+eta')' - vecnorm(xi')';
                     theta_vec = 2*(2*nu-1)/(nu-1)/m*influenceFunction(norma,par_omega).*norma.*elong.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';

@@ -23,7 +23,6 @@ function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,pa
 %% CODE
     horizon = par_omega(1);
     %jj = familyMat(ii,neighIndex);
-    x_i = x(ii,:); x_j = x(jj,:);
     dofi = dof_vec(ii,:); dofj = dof_vec(jj,:);
     xi = x(jj,:) - x(ii,:); % \xi
     u = u';

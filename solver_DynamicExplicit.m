@@ -75,6 +75,7 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             n_initial = n;
             disp('Found a partial simulation. Continuing it...')
         end
+        ind_eval = 1;
         for n = n_initial:length(t)-1
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
@@ -111,13 +112,18 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             fn = zeros(2*length(x),1); % Instatiate force vector
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
             energy_ext = zeros(length(x),1); % Pre-allocate external force
+            b_Weval = floor(n/1) ==  ind_eval;% Deciding when to evaluate the energy
+            if b_Weval 
+                ind_eval = ind_eval +1;
+            end
+           
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta);
+                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta,b_Weval);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta);
+                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii),energy_ext(ii)] = parFor_loop(x,u_n(:,n+1),dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta,b_Weval);
                 end
             end
             % Converting the temporary variables
@@ -174,7 +180,7 @@ function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt_crit = min(dt); % Critical time step
 end
 %%
-function [f_i,history_upS,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,V,body_force,theta)
+function [f_i,history_upS,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,V,body_force,theta,b_Weval)
    dofi = dof_vec(ii,:);
    % Loop on the nodes
    areaTot = 0; partialDamage = 0; % Instatiate for damage index
@@ -182,7 +188,6 @@ function [f_i,history_upS,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_
    f_i = 0;
    history_upS = history.S(ii,:);
    damage.phi = phi(ii);
-   %for neig_index = 1:length(family)
        neig_index = 1:length(family);
        jj = family(neig_index);
        % Loop on their neighbourhood
@@ -200,17 +205,21 @@ function [f_i,history_upS,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_
        % Damage index
        areaTot = sum(Vj);
        partialDamage = sum(mu_j.*Vj);
+       phi_up = 1 - partialDamage/areaTot;
         %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
+   if b_Weval
        if ~model.dilatation
            % Strain energy
            W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
        else
            W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
        end
-   %end
-   phi_up = 1 - partialDamage/areaTot;
-   % External work
-   energy_ext = dot(u_n(dofi),body_force(dofi))*V;
-   % Stored strain energy
-   energy_pot = W*V;
+       % External work
+       energy_ext = dot(u_n(dofi),body_force(dofi))*V;
+       % Stored strain energy
+       energy_pot = W*V;
+   else
+       energy_ext = dot(u_n(dofi),body_force(dofi))*V;
+       energy_pot = 0;
+   end
 end

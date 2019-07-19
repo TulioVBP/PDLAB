@@ -17,8 +17,8 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
     eta = u(dofj) - u(dofi); 
     norma = vecnorm(xi')';
     s = (vecnorm(xi'+eta')' - norma)./norma;
-    switch model.name
-        case "PMB"
+    switch model.number
+        case 1 % PMB
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
@@ -29,11 +29,11 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             end
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
-        case "Linearized LPS bond-based"
+        case 2 % "Linearized LPS bond-based"
             extension = dot(eta',xi')'./norma;
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*extension.^2/2;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
-        case "Linearized LPS"
+        case 6 %"Linearized LPS"
             kappa = c(1)*m/2+c(2)*m/3;
             alfa = c(2);
             w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
@@ -41,7 +41,7 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             if b_familyEnd
                 W = W + kappa*theta_i^2/2;
             end
-        case "Lipton Free Damage"
+        case 3 %"Lipton Free Damage"
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 XX = [historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)];
@@ -53,21 +53,16 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             V_delta = pi*horizon^2;
             w = 1/V_delta*(influenceFunction(norma,par_omega).*norma/horizon.*H(:,1).*f_potential(Slin.*sqrt(norma),c,damage));
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)') + 1/horizon^2*H(1,2)*g_potential(theta_i,c,damage);
-%             if b_familyEnd
-%                 W = W + 1/horizon^2*H(2)*g_potential(theta_i,c,damage);
-%             end
-%             if isnan(W)
-%                     erro = 1;
-%             end
-        case "LPS 2D"
-            elong = norm(xi+eta) - norm(xi);
+        case 4 %"LPS 2D"
+            elong = vecnorm(xi'+eta')' - norma;
             nu = c(3);
             %W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-            W = W + c(2)/2*influenceFunction(norma,par_omega)*elong^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-            if b_familyEnd
-                %W = W + c(1)*theta_i^2/2;
-                W = W + (c(1)/2 + c(2)*m/3*(1/6 - (nu-1)/(2*(2*nu-1))))*theta_i^2;
-            end
+            w = c(2)/2*influenceFunction(norma,par_omega).*elong.^2;
+            W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)')+ (c(1)/2 + c(2)*m/3*(1/6 - (nu-1)/(2*(2*nu-1))))*theta_i^2;
+%             if b_familyEnd
+%                 %W = W + c(1)*theta_i^2/2;
+%                 W = W + (c(1)/2 + c(2)*m/3*(1/6 - (nu-1)/(2*(2*nu-1))))*theta_i^2;
+%             end
         otherwise
     end
     %neigh_ind = neigh_ind + 1;
