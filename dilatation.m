@@ -35,7 +35,7 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                         XX = [history_upS, history.theta(ii)*ones(length(history.theta(jj)),1), history.theta(jj)]; 
                         noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
                         H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
-                        %theta(transv_ind) = sum(theta_vec.*wholeBonds);%H(:,1));
+                        %theta(transv_ind) = sum(theta_vec.*wholeBonds);
                         theta(transv_ind) = sum(theta_vec.*H(:,1)); % Tulio's model
                     else
                         theta(transv_ind) = sum(theta_vec);
@@ -43,8 +43,20 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                 case 4 %"LPS 2D"
                     nu = c(3);
                     elong = vecnorm(xi'+eta')' - vecnorm(xi')';
+                    S = elong./norma;
                     theta_vec = 2*(2*nu-1)/(nu-1)/m*influenceFunction(norma,par_omega).*norma.*elong.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                    theta(transv_ind) = sum(theta_vec);
+                    if nargin > 10
+                         historyS = history.S(ii,neigh_ind);
+                         S_max = historyS';
+                         historyS(S>S_max) = S(S>S_max);
+                         S_max = historyS';
+                         noFail = damage.noFail(ii) | damage.noFail(jj);
+                         % Evaluating the damage factor
+                         mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
+                         theta(transv_ind) = sum(theta_vec.*mu); % Tulio's model
+                    else
+                        theta(transv_ind) = sum(theta_vec);
+                    end
                 case 6%"Linearized LPS"
                     theta_vec = 3/m*influenceFunction(norma,par_omega).*dot(eta',xi')'.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                     theta(transv_ind) = sum(theta_vec);

@@ -44,6 +44,7 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.dilatation = true;
         model.number = 3; 
     case "LPS 2D"
+        horizon = par_omega(1);
         alfa = 1;
         mm = weightedVolume(par_omega);
         kappa = E*1e6/3/(1-2*nu); mu = E*1e6/2/(1+nu);
@@ -54,6 +55,13 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.linearity = false;
         model.stiffnessAnal = false;
         model.dilatation = true;
+        damage.Sc = sqrt(5*(1+nu)*pi*G0/12/(E*1e6)/horizon);
+        % Damage dependent Sc
+        if true
+            damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
+        else
+            damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
+        end
         model.number = 4;
         
         case "PMB"

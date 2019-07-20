@@ -13,7 +13,7 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
     crackSegments = size(damage.crackIn,1); % At least 2
     check = zeros(length(neighIndex),crackSegments-1);
     % {Preallocate the damage factor}
-    if model.dilatation
+    if model.number == 3 % Lipton
         mu = zeros(length(neighIndex),3);
     else
         mu = zeros(length(neighIndex),1);
@@ -24,11 +24,11 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
         %mu = mu_model(x,damage,model);
         % MU MODEL
          switch model.number
-            case 1 %"PMB"
+            case 1 %"PMB DTT"
                 % Damage dependent crack
                 alfa = 0.2; beta = 0.2; gamma = 1.4;
-                if damage.phi > alfa
-                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+                if damage.phi(ii) > alfa
+                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
                     Sc = damage.Sc;
                 end
@@ -41,11 +41,22 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
                xc = 0.15*10^-6;
                mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
                mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
+            case 4 % "LPS 2D"
+                 % Damage dependent crack
+                alfa = 0.2; beta = 0.2; gamma = 1.4;
+                if damage.phi(ii) > alfa
+                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+                else
+                    Sc = damage.Sc;
+                end
+                S0 = [-0.98 0.95*Sc]; % S0- and S0+
+                S1 = [-0.99 1.05*Sc]; % S1- and S1+
+                mu = (x<= S0(2)).*(x>=-1).*1 + (x > S0(2)).*(x<S1(2)).*(S1(2) - x)/(S1(2) - S0(2));
             case 5 % "PMB"
                 % Damage dependent crack
                 alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
-                if damage.phi > alfa
-                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+                if damage.phi(ii) > alfa
+                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
                     Sc = damage.Sc;
                 end

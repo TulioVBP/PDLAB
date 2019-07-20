@@ -94,6 +94,7 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             end
             % ---- {Evaluating dilatation} ----
             theta = zeros(length(x),1); % Preallocate theta
+            damage.phi = phi(:,n); % Accessing current damage situation
             if model.dilatation
                 if b_parll
                     parfor ii = 1:length(x)
@@ -101,7 +102,6 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
                     end
                 else
                     [theta,history_tempT] = dilatation(x,u_n(:,n+1),familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,dt);
-                    %[theta] = dilatation(x,u_n(:,n+1),familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model);
                 end
                 history.theta = history_tempT; % Assigning up-to-date history variable
             end
@@ -186,7 +186,7 @@ function [f_i,history_upS,phi_up,energy_pot,energy_ext] = parFor_loop(x,u_n,dof_
    family = familyMat(ii,familyMat(ii,:)~=0);
    f_i = 0;
    history_upS = history.S(ii,:);
-   damage.phi = phi(ii);
+   %damage.phi = phi(ii);
        neig_index = 1:length(family);
        jj = family(neig_index);
        % Loop on their neighbourhood

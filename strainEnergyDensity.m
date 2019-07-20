@@ -54,10 +54,18 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             w = 1/V_delta*(influenceFunction(norma,par_omega).*norma/horizon.*H(:,1).*f_potential(Slin,sqrt(norma),c,damage));
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)') + 1/horizon^2*H(1,2)*g_potential(theta_i,c,damage);
         case 4 %"LPS 2D"
-            elong = vecnorm(xi'+eta')' - norma;
+            if nargin > 11 && damage.damageOn
+                noFail = damage.noFail(ii) | damage.noFail(jj);
+                mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
+                p = antiderivativePMB(s,damage,noFail);
+            else
+                mu = ones(length(jj),1);
+                p = antiderivativePMB(s,damage,false);
+            end
+            %elong = vecnorm(xi'+eta')' - norma;
             nu = c(3);
-            %W =  W + c(2)/2*influenceFunction(norma,par_omega)*(elong-theta_i*norma/3)^2*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-            w = c(2)/2*influenceFunction(norma,par_omega).*elong.^2;
+            %w = c(2)/2*influenceFunction(norma,par_omega).*elong.^2;
+            w = c(2)/2*influenceFunction(norma,par_omega).*norma.^2.*(2*p).*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)')+ (c(1)/2 + c(2)*m/3*(1/6 - (nu-1)/(2*(2*nu-1))))*theta_i^2;
         case 5 %"PMB"
             if nargin > 11 && damage.damageOn
@@ -127,6 +135,7 @@ end
 
 function ff = f_potential(S,norma,c,damage)
 r1 = damage.Sc.*norma;
+%r1 = 3; % Uncomment for a better result
 r2 = r1;
 x = S.*norma;
 if damage.damageOn

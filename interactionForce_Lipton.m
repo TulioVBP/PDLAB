@@ -60,6 +60,7 @@ end
 
 function ff = fscalar(x,norma,c,damageOn,Sc)
 r1 = Sc*sqrt(norma);
+%r1 = 3; % Uncomment for a better result
 r2 = r1;
 if damageOn
     ff = (x.*sqrt(norma) <= r1).*c(1).*x.*sqrt(norma)...
