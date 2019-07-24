@@ -7,9 +7,9 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
        transvList = 1:length(x);
     end
     if exist('history','var')
-        history_thetaUp = history.theta;
+        history_theta = history.theta;
     else
-        history_thetaUp = [];
+        history_theta = [];
     end
     theta = zeros(length(transvList),1); % Initialize dilatation vector
     transv_ind = 1; % Introduced so that we can pass as argument a smaller matrix
@@ -63,7 +63,8 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                 otherwise
                     break;
             end
-        if nargin == 12
+        history_thetaUp = zeros(length(transvList),1); % Prellocating memory for theta up
+        if nargin == 13
             history_thetaUp(transv_ind) = history_theta(transv_ind) + jth(theta(transv_ind),thetac_p,thetac_m)*dt; % Update integral of dilatation of x_i for this specific interaction 
         end
         transv_ind = transv_ind + 1; 
