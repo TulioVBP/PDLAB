@@ -8,25 +8,29 @@ close all
 % - phi: damage index
 % - energy: struct variable with all the energies for the system
 % - idb: come on, I know you know how this one works
-%% Making u a 3D matrix
-u = threeDModification(x,u,idb);
-%% Plot the displacement and strain map
-displacementPlot(x,u(:,:,n));
-strainPlot(x,u(:,:,n)); % To be perfected
-%plotClassicalDerivative(x,u(:,:,n))
+if ~isempty(u)
+    %% Making u a 3D matrix
+    u = threeDModification(x,u,idb);
+    %% Plot the displacement and strain map
+    displacementPlot(x,u(:,:,n));
+    strainPlot(x,u(:,:,n)); % To be perfected
+    %plotClassicalDerivative(x,u(:,:,n))
+end
 %% Plot the damage index
 if exist('phi','var')~=0
     damagePlot(x,phi(:,n));
+    % Plot the crack properties
+    if exist('dt','var')
+        trackCrack(x,phi,n,dt);
+    end
 end
 
-%% Plot the crack properties
-if exist('dt','var')
-    trackCrack(x,phi,n,dt);
-end
 
 %% Plot the total energy
-if exist('energy','var')~=0
-    energyPlot(x,energy,n);
+if exist('energy','var')~=0 
+    if ~isempty(energy)
+        energyPlot(x,energy,n);
+    end
 end
 
 end
@@ -69,8 +73,8 @@ function strainPlot(x,u)
 %         else
         if ~ismember(ii,out_layers)
             % Bulk nodes
-            exx(ii) = (v(ii+1) - v(ii-1))/2*h; % dv/dx
-            eyy(ii) = (w(ii+N) - w(ii-N))/2*h; % dw/dy
+            exx(ii) = (v(ii+1) - v(ii-1))/2/h; % dv/dx
+            eyy(ii) = (w(ii+N) - w(ii-N))/2/h; % dw/dy
             exy(ii) = 1/4/h*(v(ii+N) - v(ii-N) + w(ii+1) - w(ii-1)); % 1/2*(dv/dy + dw/dx)
         else
             exx(ii) = 0; % dv/dx
@@ -227,7 +231,7 @@ function damagePlot(x,phi)
         end        
     end
     figure
-    pcolor(X,Y,PHI)
+    hh = pcolor(X,Y,PHI)
     xlabel x
     ylabel y
     title('Damage index')
@@ -235,8 +239,9 @@ function damagePlot(x,phi)
     c = jet(1000);
     colormap(c);
     colorbar
-    caxis([0 1]);
+    caxis([0 0.5]);
     axis equal
+    set(hh,'EdgeColor', 'none');
 end
 
 function energyPlot(x,energy,n_final)
@@ -293,7 +298,7 @@ function trackCrack(x,phi,n_final,dt)
     if n_final < data_dump
        data_dump = n_final; 
     end
-    samples = floor(n_final/data_dump+1/2);
+    samples = floor(n_final/data_dump);
     V_l = zeros(samples,1);
     for n_samp = 0:samples
         n = 1+data_dump*n_samp;
@@ -301,7 +306,7 @@ function trackCrack(x,phi,n_final,dt)
         x_dam = x(set_dam,:); % Set of probable tips
         x_max = max(x_dam(:,1));
         if ~isempty(set_dam)
-            damx_ind = (x_dam(:,1) > x_max - 1e-12);
+            damx_ind = (x_dam(:,1) == x_max);% - 1e-12);
             set_dam = set_dam(damx_ind);
             if length(set_dam) > 1
                 y_max = max(x_dam(damx_ind,2));
@@ -312,7 +317,7 @@ function trackCrack(x,phi,n_final,dt)
                 tip(2) = set_dam;
             end
             if n_samp > 1
-                V_l(n_samp+1) = norm(x(tip(2),:)-x(tip(1),:))/dt/data_dump;
+                V_l(n_samp+1) = norm(x(tip(2),1)-x(tip(1),1))/dt/data_dump;
                 tip(1) = tip(2);
             else
                 tip(1) = set_dam;
@@ -321,8 +326,8 @@ function trackCrack(x,phi,n_final,dt)
     end
     % Plot the velocity
     figure
-    plot(0:samples,V_l,'-d','LineWidth',1.5)
-    xlabel('Sample')
+    plot((0:samples)*(data_dump*dt),V_l,'-d','LineWidth',1.5)
+    xlabel('Simulation time')
     ylabel('Velocity of the crack tip (m/s)')
     set(gca,'FontSize',13)
     grid on
@@ -331,12 +336,12 @@ end
 function u = threeDModification(x,u_2D,idb)
     if size(u_2D,1) == 2*length(x)
         u = zeros(length(x),2,size(u_2D,2));
-        for ii = 1:length(x)
+        ii = (1:length(x))';
             dofi = [idb(2*ii-1) idb(2*ii)];
             for n = 1:size(u_2D,2)
-                u(ii,:,n) = u_2D(dofi,n)';
+                u_temp = u_2D(:,n);
+                u(:,:,n) = u_temp(dofi);
             end
-        end
     else
         u = u_2D;
     end

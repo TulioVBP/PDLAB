@@ -38,7 +38,8 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
             case 3 %"Lipton Free Damage"
                %% Ht
                % Evaluating h
-               xc = 0.15*10^-6;
+               %xc = 0.15*10^-6;
+               xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
                mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
                mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
             case 4 % "LPS 2D"

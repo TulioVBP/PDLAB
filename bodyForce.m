@@ -1,4 +1,4 @@
-function [b,noFailZone] = bodyForce(x,stresses,m,h,A,tractionOpt)
+function [b,noFailZone] = bodyForce(x,stresses,m,h,A,tractionOpt,B_given)
 % NEEDED UPDATE: Make it more general so that one can apply non-homogeneous
 %                traction forces
 %% INPUT:
@@ -41,21 +41,25 @@ end
     tauxy = stresses(3);
     b = zeros(size(x));
     
-    if contains(tractionOpt,'t')
-        % Top layer
-        b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
-    end
-    if contains(tractionOpt,'b')
-        % Bottom layer
-        b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
-    end
-    if contains(tractionOpt,'l')
-        % Left layer
-        b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
-    end
-    if contains(tractionOpt,'r')
-        % Right layer
-        b(rightLay,:) = b(rightLay,:) + [sigmax,tauxy]*h/m./A(rightLay);
+    if contains(tractionOpt,'-')
+        b(B_given(:,1),:) = b(B_given(:,1),:) + B_given(:,2:3);
+    else
+        if contains(tractionOpt,'t')
+            % Top layer
+            b(topLay,:) = b(topLay,:) + [tauxy,sigmay]*h/m./A(topLay);
+        end
+        if contains(tractionOpt,'b')
+            % Bottom layer
+            b(bottomLay,:) = b(bottomLay,:) + [-tauxy,-sigmay]*h/m./A(bottomLay);
+        end
+        if contains(tractionOpt,'l')
+            % Left layer
+            b(leftLay,:) = b(leftLay,:) + [-sigmax,-tauxy]*h/m./A(leftLay);
+        end
+        if contains(tractionOpt,'r')
+            % Right layer
+            b(rightLay,:) = b(rightLay,:) + [sigmax,tauxy]*h/m./A(rightLay);
+        end
     end
     %% Defining no fail zone
     noFailZone = zeros(length(x),1);    

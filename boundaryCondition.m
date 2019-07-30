@@ -1,10 +1,13 @@
-function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,tractionOpt)
+function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option,tractionOpt,pc)
 %% INPUT parameter: 
 % - x: the nodes position 
 % - stresses: [sigma_x, sigma_y, tau_xy]
 % - m: number of nodes inside delta
 % - h: grid spacing
 % - A: element area
+% - option: boundary condition option (soon to be removed)
+% - tractionOpt: where the stresses are applied
+% - pc: prescribed constraints
 %% OUTPUT parameter
 % - ndof: Number of degree of freedoms
 % - idb: collumn vector that index each of its row (corresponding to the
@@ -18,24 +21,64 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,t
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
 
     %% DEFINE THE BOUNDARY CONDITIONS
-    if test
+    switch option
+        case 1
         % Implement here your test
         % Example of BCs
         b = max(x(:,1));
         rightLay = find(x(:,1) == b);
-        bottomLay = find(x(:,2) == 0);
+        bottomLay = find(x(:,2) == min(x(:,2)));
         dof_Right = rightLay*2 - 1; % Constrain the x dof
         dof_Bot = bottomLay*2; % Constrain the y dof
         bc_set(:,1) = [dof_Right; dof_Bot]; % Each degree of freedom have a index number related
         bc_set(:,1) = sort(bc_set(:,1));
         bc_set(:,2:3) = zeros(length(bc_set(:,1)),2);
-    else
+        B_given = [];
+        case 0
         % Experiment itself
         a = max(x(:,2));
         bottomLay = find(x(:,2) == 0);
         topLay = find(x(:,2) == a);
         bc_set = [];
+        B_given = [];
+        case 2
+            % 4 point bending test
+            h = vecnorm(x(1,:) - x(2,:));
+            b = max(x(:,1));
+            bottomLay = find(x(:,2) == min(x(:,2)));
+            topLay = find(x(:,2) == max(x(:,2)));
+            bottom_constraint = bottomLay([2,length(bottomLay)-1]);
+            top_constraint = topLay([2*floor(length(topLay)/5) 3*floor(length(topLay)/5)]);
+            dof_bot = [bottom_constraint'*2 bottom_constraint(1)*2-1]';
+            B_given = [top_constraint, zeros(length(top_constraint),1),-stresses(2)/h*ones(length(top_constraint),1)];
+            bc_set(:,1) = [dof_bot]; % Each degree of freedom have a index number related
+            bc_set(:,1) = sort(bc_set(:,1));
+            bc_set(:,2:3) = zeros(length(bc_set(:,1)),2);
+        case 3
+            % Different prescribed case
+            % - Displacement
+            if ~isempty(pc.disp)
+                dof_disp_constraint(:,1) = [2*(pc.disp(logical(pc.disp(:,2)),1))-1; 2*pc.disp(logical(pc.disp(:,3)),1)]; % [node boolean boolean value value]
+                dof_disp_constraint(:,2) = [pc.disp(logical(pc.disp(:,2)),4); pc.disp(logical(pc.disp(:,3)),5)]; % Values
+                bc_set(:,1) = dof_disp_constraint(:,1);
+                bc_set(:,2) = dof_disp_constraint(:,2);
+                bc_set(:,3) = zeros(size(bc_set(:,1)));
+            end
+            % - Velocity
+            if ~isempty(pc.vel)
+                dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2)),1))-1; 2*pc.vel(logical(pc.vel(:,3)),1)]; % [boolean boolean value value]
+                dof_velocity_constraint(:,2) = [pc.vel(logical(pc.vel(:,2)),4); pc.disp(logical(pc.vel(:,3)),5)]; % Values
+                bc_set(:,1) = [bc_set(:,1); dof_velocity_constraint(:,1)];
+                bc_set(:,2) = [bc_set(:,3); dof_disp_constraint(:,3)];
+            end
+            
+            [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
+            bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
+            
+            % - Traction forces
+            B_given = pc.bodyForce(:,1:3); % [node, b_x, b_y] 
     end
+    
     %% DEFINE THE IDB VECTOR
     ndof = 2*length(x) - length(bc_set);
     %in_ndof = 1:2*length(x);
@@ -61,7 +104,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,t
     % Ensure compatibility between idb for constrained nodes and bc_set -
     % TO BE DONE
     %% DEFINE THE BODY FORCE
-    [b_old,noFail] = bodyForce(x,stresses, m, h, A,tractionOpt);
+    [b_old,noFail] = bodyForce(x,stresses, m, h, A,tractionOpt,B_given);
     bb = zeros(2*length(x),1);
     for ii = 1:length(b_old)
         dofi = [idb(2*ii-1) idb(2*ii)];
@@ -75,10 +118,12 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,test,t
    scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled')
    if ~isempty(bc_set) 
     scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled')
+    legend('Free nodes','Traction forces nodes','Displacement const. nodes')
+   else
+    legend('Free nodes','Traction forces nodes')
    end
    axis equal
    grid on
-   legend('Free nodes','Traction forces nodes','Displacement const. nodes')
    xlabel('x (m)'); ylabel('y (m)')
    title('Boundary conditions')
    set(gca,'FontSize',13)

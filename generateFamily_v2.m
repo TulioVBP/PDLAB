@@ -1,4 +1,4 @@
-function [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,horizon,d,option,test,PA_alg,surf_Alg)
+function [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,horizon,dm,option,test,PA_alg,surf_Alg)
 % PA-HHB IMPLEMENTATION
 % Volume correction implementation
 % INPUT : 
@@ -33,7 +33,7 @@ end
 %% Checking for family file
 filename = strcat('family',int2str(option),'.mat');
 if exist(filename,'file')
-    columns = (2*ceil(d) + 1)^2;
+    columns = (2*ceil(dm) + 1)^2;
     load(filename);
     colFile = size(family,2);
     existence = true;
@@ -53,7 +53,7 @@ if ~existence
     h = x(2,1) - x(1,1); % Spacing of the grid
     numx = floor(lengthx/h+1/2)+1; % Number of collumns in the mesh
     numy = floor(lengthy/h+1/2)+1; % Number of rows in the mesh
-    columns = (2*ceil(d) + 1)^2;
+    columns = (2*ceil(dm) + 1)^2;
     family = zeros(N,columns); % Instatiate the family matrix. We arbitrarily say that the number of points inside the neighbourhood doesn't surpass 1/5 of the mesh points.
     partialAreas = family; % Also Instatiate familyInfo matrix with zeros
     maxNeigh = 0;
@@ -63,7 +63,7 @@ if ~existence
             for iI = 1:N
                set = 1;
                % Compute the maximum number of one-sided neighbors interactions on the x-direction
-               Nx = floor(horizon/h + 1/2 - 1e-14);
+               Nx = floor(horizon/h + 1/2 - 1e-10);
                % Check for borders
                if rem(iI,numx) == 0
                    i = numx;
@@ -87,12 +87,16 @@ if ~existence
                       Ny = Nx;
                    else
                       norma_1 = abs(x(iI,1) - x(k + (j-1)*numx,1));
-                      Ny = floor((sqrt(horizon^2 - (norma_1 - h/2)^2))/h + 1/2 - 1e-14);
+                      Ny = floor((sqrt(horizon^2 - (norma_1 - h/2)^2))/h + 1/2 - 1e-10);
                    end
                    % Check for borders
                    if j-1 < Ny 
                       Ny_bot = j-1;
-                      Ny_top = Ny;
+                      if numy - j < Ny
+                        Ny_top = numy - j;
+                      else
+                        Ny_top = Ny;
+                      end
                    elseif numy - j < Ny
                       Ny_bot = Ny;
                       Ny_top = numy - j;
@@ -116,6 +120,9 @@ if ~existence
                N_family = set - 1; % Number of points whithin the neighbourhood of i
                for setII = 1:N_family
                    iII = family(iI,setII);
+                   if iII > 287 || iI > 287
+                       p = 1;
+                   end
                    if x(iII,1) < x(iI,1)           
                       x_tr = x(iI,1) + (x(iI,1) - x(iII,1)); % Translate cell from left to right
                    else
@@ -147,7 +154,7 @@ if ~existence
                    elseif counter == 3 
                        % Compute A: CASE II
                        % Geometric parameters
-                       H1 = y_tr + h/2 - x(iI,2); L1 = sqrt(horizon^2 - H1^2); L2 = x_tr + h/2 - x(iI,1); H2 = sqrt(horizon^2 - L2^2); d = sqrt((H1-H2)^2 + (L2 - L1)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
+                       H1 = y_tr + h/2 - x(iI,2); L1 = sqrt(horizon^2 - H1^2); L2 = x_tr + h/2 - x(iI,1); H2 = sqrt(horizon^2 - L2^2);d =sqrt((H1-H2)^2 + (L2 - L1)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
                        % Area
                        A_k = h^2 - 1/2*(L2-L1)*(H1 - H2) + gamma*horizon^2 - 1/2*d*l;
                        % Family Info
@@ -165,7 +172,7 @@ if ~existence
                                else
                                    % Compute A: CASE III(b)
                                    % Geometric parameters
-                                   l = sqrt(horizon^2 - (h/2)^2); L = x_tr + h/2 - x(iI,1); gamma = acos(l/horizon); beta = acos(L/horizon); d = 2*sqrt(horizon^2 - L^2);
+                                   l = sqrt(horizon^2 - (h/2)^2); L = x_tr + h/2 - x(iI,1); gamma = acos(l/horizon); beta = acos(L/horizon);d =2*sqrt(horizon^2 - L^2);
                                    % Area
                                    A_k = h^2-(L-l)*h + ((gamma*horizon^2 - 1/2*h*l) - (beta*horizon^2 - 1/2*d*L));
                                    % Family Info
@@ -176,7 +183,7 @@ if ~existence
                                if rbr_sq > horizon^2
                                   % Compute A: CASE III(a1)
                                   % Geometric parameters
-                                  H1 = y_tr + h/2 - x(iI,2); H2 = y_tr - h/2 - x(iI,2); L1 = sqrt(horizon^2 - H1^2); L2 = sqrt(horizon^2 - H2^2); d = sqrt((L2 - L1)^2 + h^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
+                                  H1 = y_tr + h/2 - x(iI,2); H2 = y_tr - h/2 - x(iI,2); L1 = sqrt(horizon^2 - H1^2); L2 = sqrt(horizon^2 - H2^2);d =sqrt((L2 - L1)^2 + h^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
                                   % Area
                                   A_k = h*((L1+L2)/2 - (x_tr - h/2 - x(iI,1))) + gamma*horizon^2 - 1/2*d*l;
                                   % Family Info
@@ -184,7 +191,7 @@ if ~existence
                                else
                                   % Compute A: CASE III(c)
                                   % Geometric parameters
-                                  L1 = x_tr - h/2 - x(iI,1); L2 = x_tr + h/2 -x(iI,1); H1 = sqrt(horizon^2 - L1^2); H2 = sqrt(horizon^2 - L2^2); d = sqrt(h^2 + (H1-H2)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
+                                  L1 = x_tr - h/2 - x(iI,1); L2 = x_tr + h/2 -x(iI,1); H1 = sqrt(horizon^2 - L1^2); H2 = sqrt(horizon^2 - L2^2);d =sqrt(h^2 + (H1-H2)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
                                   % Area
                                   A_k = h*((H1+H2)/2 - (y_tr - h/2 - x(iI,2))) + gamma*horizon^2 - 1/2*d*l;
                                   % Family Info
@@ -194,7 +201,7 @@ if ~existence
                    elseif counter == 1
                        % Compute A: CASE IV
                        % Geometric parameters
-                       L1 = x_tr - h/2 - x(iI,1); H2 = y_tr - h/2 - x(iI,2); H1 = sqrt(horizon^2 - L1^2); L2 = sqrt(horizon^2 - H2^2); d = sqrt((L2-L1)^2 + (H1 - H2)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
+                       L1 = x_tr - h/2 - x(iI,1); H2 = y_tr - h/2 - x(iI,2); H1 = sqrt(horizon^2 - L1^2); L2 = sqrt(horizon^2 - H2^2);d =sqrt((L2-L1)^2 + (H1 - H2)^2); l = sqrt(horizon^2 - (d/2)^2); gamma = asin(d/2/horizon);
                        % Area
                        A_k = 1/2*(L2-L1)*(H1-H2) + gamma*horizon^2 - 1/2*d*l;
                        % Generate family info
