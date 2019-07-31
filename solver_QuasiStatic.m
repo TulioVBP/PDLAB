@@ -63,11 +63,16 @@ for n = 1:n_tot
         un(:,n) = u_trial + du;
     end
     % Energy
-    theta = dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,c,model);
+    theta = dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,c,model); 
     for ii=1:length(x)
        dofi = dof_vec(ii,:);
        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage)*V;
-       energy.EW(ii,n) = dot(bn(dofi),un(dofi,n))*V;
+       if n>1
+       bn_1 = b*((n-1)/n_tot); % b_(n-1)
+       energy.EW(ii,n) = dot(bn(dofi)+bn_1(dofi),un(dofi,n)-un(dofi,n-1))/2*V + energy.EW(ii,n-1);
+       else
+       energy.EW(ii,n) = dot(bn(dofi)-0,un(dofi,n)-0)/2*V;
+       end
     end
 end
 

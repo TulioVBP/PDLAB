@@ -67,16 +67,19 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
             % - Velocity
             if ~isempty(pc.vel)
                 dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2)),1))-1; 2*pc.vel(logical(pc.vel(:,3)),1)]; % [boolean boolean value value]
-                dof_velocity_constraint(:,2) = [pc.vel(logical(pc.vel(:,2)),4); pc.disp(logical(pc.vel(:,3)),5)]; % Values
-                bc_set(:,1) = [bc_set(:,1); dof_velocity_constraint(:,1)];
-                bc_set(:,2) = [bc_set(:,3); dof_disp_constraint(:,3)];
+                dof_velocity_constraint(:,2) = [pc.vel(logical(pc.vel(:,2)),4); pc.vel(logical(pc.vel(:,3)),5)]; % Values
+                bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
             end
             
             [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
             bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
             
             % - Traction forces
-            B_given = pc.bodyForce(:,1:3); % [node, b_x, b_y] 
+            if ~isempty(pc.bodyForce)
+                B_given = pc.bodyForce(:,1:3); % [node, b_x, b_y]
+            else
+                B_given = [];
+            end
     end
     
     %% DEFINE THE IDB VECTOR
@@ -118,7 +121,8 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
    scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled')
    if ~isempty(bc_set) 
     scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled')
-    legend('Free nodes','Traction forces nodes','Displacement const. nodes')
+    scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled')
+    legend('Free nodes','Traction forces nodes','Displacement const. nodes','Velocity nodes')
    else
     legend('Free nodes','Traction forces nodes')
    end

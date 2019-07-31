@@ -11,4 +11,6 @@ for ii = 1:N
     end
 end
 A = h^2; % Elements' area
+% Symmetry
+x = x - [max(x(:,1))/2 max(x(:,2))/2];
 end

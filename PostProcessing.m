@@ -8,6 +8,7 @@ close all
 % - phi: damage index
 % - energy: struct variable with all the energies for the system
 % - idb: come on, I know you know how this one works
+
 if ~isempty(u)
     %% Making u a 3D matrix
     u = threeDModification(x,u,idb);
@@ -87,7 +88,7 @@ function strainPlot(x,u)
     b = max(x(:,1))-h/2 - min(x(:,1))+h/2;
     a = max(x(:,2))-h/2 - min(x(:,2))+h/2;
     % Transforming into a matrix array
-    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1)),min(x(:,2)):h:max(x(:,2)));
+    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1))+1e-13, min(x(:,2)):h:max(x(:,2))+1e-13);
     EXX = zeros(size(X)); EYY = zeros(size(Y)); EXY = zeros(size(X));
     for jjj = 1:size(X,2)
         for iii = 1:size(Y,1)
@@ -126,31 +127,16 @@ function strainPlot(x,u)
 end
 
 function displacementPlot(x,u)
-    b = max(x(:,1) - min(x(:,1)));
-    a = max(x(:,2) - min(x(:,2)));
+    b = max(x(:,1)) - min(x(:,1));
+    a = max(x(:,2)) - min(x(:,2));
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
-    [X,Y] = meshgrid(0:h:b, 0:h:a);
-    V = zeros(size(X)); W = zeros(size(Y));
-    for jjj = 1:size(X,2)
-        for iii = 1:size(Y,1)
-            %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
-            %reliable
-            coord = [X(1,jjj) Y(iii,1)];
-            for ii = 1:length(x)
-               if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
-                   ind = ii;
-                   break;
-               end
-            end
-            if ~isempty(ind)
-                V(iii,jjj) = u(ind,1);
-                W(iii,jjj) = u(ind,2);
-            else
-                disp('Error: problem with the matching condition')
-            end
-        end        
-    end
+    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1))+1e-13, min(x(:,2)):h:max(x(:,2))+1e-13);
+    V = zeros(size(X));
+    W = zeros(size(X));
+    sz = flip(size(X));
+    V = reshape(u(:,1),sz)';
+    W = reshape(u(:,2),sz)';
     figure
     subplot(2,1,1)
     surf(X,Y,V)
@@ -167,7 +153,7 @@ function displacementPlot(x,u)
     zlabel uy
     set(gca,'FontSize',15)
     %% Plot displacement in the mesh
-    scaleFactor = 1e3;
+    scaleFactor = 1e2;
     % Mesh
     figure
     mesh(X,Y,zeros(size(X)),'LineWidth',1)
@@ -210,7 +196,7 @@ function damagePlot(x,phi)
     a = max(x(:,2) - min(x(:,2)));
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
-    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1))+1e-13, min(x(:,2)):h:max(x(:,2))+1e-13);
     PHI = zeros(size(X));
     for jjj = 1:size(X,2)
         for iii = 1:size(Y,1)
@@ -231,7 +217,7 @@ function damagePlot(x,phi)
         end        
     end
     figure
-    hh = pcolor(X,Y,PHI)
+    hh = pcolor(X,Y,PHI);
     xlabel x
     ylabel y
     title('Damage index')
@@ -245,26 +231,12 @@ function damagePlot(x,phi)
 end
 
 function energyPlot(x,energy,n_final)
-   %% Total energy evolution
-   int = energy.W + energy.KE - energy.EW; % Total energy for each point
-   t = 1:1:n_final; % Number of time steps
-   figure
-   plot(t,sum(energy.W(:,1:n_final)),'--','LineWidth',1.5)
-   hold on
-   plot(t,sum(energy.KE(:,1:n_final)),'-.','LineWidth',1.5)
-   plot(t,sum(energy.EW(:,1:n_final)),'-d','LineWidth',1.5)
-   plot(t,sum(int(:,1:n_final)),'-','LineWidth',1.5)
-   legend('Strain energy','Kinetic energy','External work','Total internal energy')
-   xlabel('Time step n')
-   ylabel('Energy (J/m)')
-   set(gca,'FontSize',15)
-   grid on
    %% Strain energy density
     b = max(x(:,1) - min(x(:,1)));
     a = max(x(:,2) - min(x(:,2)));
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
-    [X,Y] = meshgrid(0:h:b, 0:h:a);
+    [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1))+1e-13, min(x(:,2)):h:max(x(:,2))+1e-13);
     WW = zeros(size(X));
     for jjj = 1:size(X,2)
         for iii = 1:size(Y,1)
@@ -290,6 +262,21 @@ function energyPlot(x,energy,n_final)
     ylabel y
     title('Strain Energy Density')
     set(gca,'FontSize',15)
+   %% Total energy evolution
+   int = energy.W + energy.KE - energy.EW; % Total energy for each point
+   t = 1:1:n_final; % Number of time steps
+   figure
+   plot(t,sum(energy.W(:,1:n_final)),'--','LineWidth',1.5)
+   hold on
+   plot(t,sum(energy.KE(:,1:n_final)),'-.','LineWidth',1.5)
+   plot(t,sum(energy.EW(:,1:n_final)),'-','LineWidth',1.5)
+   plot(t,sum(int(:,1:n_final)),'-','LineWidth',2.0)
+   legend('Strain energy','Kinetic energy','External work','Total internal energy')
+   xlabel('Time step n')
+   ylabel('Energy (J/m)')
+   set(gca,'FontSize',15)
+   grid on
+
    
 end
 

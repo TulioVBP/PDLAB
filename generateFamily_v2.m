@@ -120,9 +120,6 @@ if ~existence
                N_family = set - 1; % Number of points whithin the neighbourhood of i
                for setII = 1:N_family
                    iII = family(iI,setII);
-                   if iII > 287 || iI > 287
-                       p = 1;
-                   end
                    if x(iII,1) < x(iI,1)           
                       x_tr = x(iI,1) + (x(iI,1) - x(iII,1)); % Translate cell from left to right
                    else
