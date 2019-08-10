@@ -1,4 +1,4 @@
-function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option,tractionOpt,pc)
+function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option,tractionOpt,pc,damage)
 %% INPUT parameter: 
 % - x: the nodes position 
 % - stresses: [sigma_x, sigma_y, tau_xy]
@@ -8,6 +8,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
 % - option: boundary condition option (soon to be removed)
 % - tractionOpt: where the stresses are applied
 % - pc: prescribed constraints
+% - damage: damage struct variable
 %% OUTPUT parameter
 % - ndof: Number of degree of freedoms
 % - idb: collumn vector that index each of its row (corresponding to the
@@ -113,19 +114,33 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
         dofi = [idb(2*ii-1) idb(2*ii)];
         bb(dofi) = b_old(ii,:)'; % Assigning the body force values to the collumn vector
     end
+   %% Updating no fail variable
+   if ~isempty(bc_set)
+    constraintNodes = sort(floor(bc_set(:,1)/2+2/3));
+    noFail(constraintNodes) = 1;
+   end
+   if contains(tractionOpt,'off')
+       noFail = zeros(size(noFail));
+   end
     
    %% Plot the b.c.s
    figure 
-   scatter(x(:,1),x(:,2),'b','filled')
+   scatter(x(:,1),x(:,2),'b','filled','DisplayName','Free nodes')
    hold on
-   scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled')
+   scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled','DisplayName','Traction force nodes')
    if ~isempty(bc_set) 
-    scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled')
-    scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled')
-    legend('Free nodes','Traction forces nodes','Displacement const. nodes','Velocity nodes')
+    scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled','DisplayName','Displacement const. nodes')
+    scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled','DisplayName','Velocity nodes')
+    %legend('Free nodes','Traction forces nodes','Displacement const. nodes','Velocity nodes')
    else
-    legend('Free nodes','Traction forces nodes')
+    %legend('Free nodes','Traction forces nodes')
    end
+   if nargin > 8
+      x_crack = damage.crackIn(:,1);
+      y_crack = damage.crackIn(:,2);
+      line(x_crack,y_crack,'Color','red','LineWidth',4,'DisplayName','Initial crack')
+   end
+   legend
    axis equal
    grid on
    xlabel('x (m)'); ylabel('y (m)')

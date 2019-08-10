@@ -108,8 +108,8 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
                 history.theta = history_tempT; % Assigning up-to-date history variable
             end
             
-            % ### Step 3 - Update velocity
-            % Evaluate f[n+1]
+            % ####### Step 3 - Update velocity 
+            % {Evaluate f[n+1]}
             fn = zeros(2*length(x),1); % Instatiate force vector
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
             energy_ext = zeros(length(x),1); % Pre-allocate external force 
@@ -137,8 +137,13 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             % {External work}
             energy_ext = dot(uu(dof_vec)',body_force(dof_vec)')'*V;
             %{External work realized by the velocity constraint} - Not working
-            vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
-            v = bc_set(bc_set(:,3)~=0,3);
+            if ~isempty(bc_set)
+                vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
+                v = bc_set(bc_set(:,3)~=0,3);
+            else
+                vel_dof = [];
+                v = [];
+            end
             bf = -fn(vel_dof);
             du = v*dt;
             add_ext = bf.*du*V;

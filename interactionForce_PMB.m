@@ -31,6 +31,9 @@ function [f,history,mu] = interactionForce_PMB(x,u,ii,jj,dof_vec,par_omega,c,mod
         S_max = history';
         % Evaluating the damage factor
         mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
+        if mu < 1
+            a = 1;
+        end
     else % No damage considered
         history = S;
         mu = ones(length(S),1);

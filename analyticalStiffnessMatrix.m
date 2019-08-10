@@ -1,5 +1,5 @@
 % Function to generate the stiffness matrix for the quasi-static solver
-function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,c,model,damage)
+function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history)
 %% INPUT:
 % ------------------------------------------------------------
 % - x: position of the nodes

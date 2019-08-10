@@ -37,17 +37,17 @@ function [f,history,mu] = interactionForce_PMBDTT(x,u,ii,jj,dof_vec,par_omega,c,
         noFail = [];
     end
     % Evaluating the force interaction
-    f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S.*mu,damage,noFail).*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
+    f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S.*mu,damage,noFail,ii).*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
 end
 
-function ff = fscalar(x,damage,noFail)
+function ff = fscalar(x,damage,noFail,ii)
 %%
 %global S0 S1 damageOn
 if damage.damageOn
     % Damage dependent crack
     alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
     if damage.phi > alfa
-        Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+        Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
     else
         Sc = damage.Sc;
     end

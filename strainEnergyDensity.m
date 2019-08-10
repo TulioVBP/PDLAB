@@ -22,10 +22,10 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
-                p = antiderivative(s,damage,noFail);
+                p = antiderivative(s,damage,noFail,ii);
             else
                 mu = ones(length(jj),1);
-                p = antiderivative(s,damage,false);
+                p = antiderivative(s,damage,false,ii);
             end
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
@@ -57,10 +57,10 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
-                p = antiderivativePMB(s,damage,noFail);
+                p = antiderivativePMB(s,damage,noFail,ii);
             else
                 mu = ones(length(jj),1);
-                p = antiderivativePMB(s,damage,false);
+                p = antiderivativePMB(s,damage,false,ii);
             end
             %elong = vecnorm(xi'+eta')' - norma;
             nu = c(3);
@@ -71,10 +71,10 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
-                p = antiderivativePMB(s,damage,noFail);
+                p = antiderivativePMB(s,damage,noFail,ii);
             else
                 mu = ones(length(jj),1);
-                p = antiderivativePMB(s,damage,false);
+                p = antiderivativePMB(s,damage,false,ii);
             end
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
@@ -84,13 +84,13 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
     %end
 end
 
-function p = antiderivative(x,damage,noFail)
+function p = antiderivative(x,damage,noFail,ii)
     % Modified PMB model
     if damage.damageOn
         % Damage dependent crack
         alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
         if damage.phi > alfa
-            Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
         else
             Sc = damage.Sc;
         end
@@ -115,13 +115,13 @@ function p = antiderivative(x,damage,noFail)
 end
 
 
-function p = antiderivativePMB(x,damage,noFail)
+function p = antiderivativePMB(x,damage,noFail,ii)
     % Modified PMB model
     if damage.damageOn
         % Damage dependent crack
         alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
         if damage.phi > alfa
-            Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
         else
             Sc = damage.Sc;
         end

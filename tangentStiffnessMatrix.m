@@ -1,6 +1,6 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage,history)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-7; % According to the roadmap
 N = length(u);
@@ -51,11 +51,11 @@ for ii=1:length(x)
                 neigh_index = 1:length(kk);
                 dofi = dof_vec(ii,:);
                 if model.dilatation
-                    [T_plus,~,~] = T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
-                    [T_minus,~,~] = T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+                    [T_plus,~,~] = T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,c,model,[],damage,0,history.S(ii,neigh_index),history.theta,[]);
+                    [T_minus,~,~] = T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,c,model,[],damage,0,history.S(ii,neigh_index),history.theta,[]);
                 else
-                    [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage);
-                    [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage);
+                    [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
+                    [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
                 end
                 f_plus = T_plus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero
                 f_minus = T_minus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero again
