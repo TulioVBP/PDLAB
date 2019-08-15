@@ -46,7 +46,7 @@ function ff = fscalar(x,damage,noFail,ii)
 if damage.damageOn
     % Damage dependent crack
     alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
-    if damage.phi > alfa
+    if damage.phi(ii) > alfa
         Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
     else
         Sc = damage.Sc;

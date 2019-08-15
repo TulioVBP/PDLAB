@@ -28,7 +28,7 @@ function [f,historyS,mu] = interactionForce_StateBased(x,u,theta,ii,jj,dof_vec,p
     % Dilatation term
     %theta = [theta(ii) theta(jj)];
     m = weightedVolume(par_omega);
-    ff = fscalar(S,damage,noFail);
+    ff = fscalar(S,damage,noFail,ii);
     T_ij = 2*(2*nu-1)/(nu-1)*((c(1) + c(2)/9*m*(-nu+2)/(2*nu-1))*influenceFunction(norma,par_omega).*norma/m)*theta(ii) ...
         + c(2)*influenceFunction(norma,par_omega).*norma.*mu.*ff;%.*(elong);
     T_ji = 2*(2*nu-1)/(nu-1)*((c(1) + c(2)/9*m*(-nu+2)/(2*nu-1))*influenceFunction(norma,par_omega).*norma/m).*theta(jj) ...
@@ -38,14 +38,14 @@ function [f,historyS,mu] = interactionForce_StateBased(x,u,theta,ii,jj,dof_vec,p
     %historyS = 0;
 end
 
-function ff = fscalar(x,damage,noFail)
+function ff = fscalar(x,damage,noFail,ii)
 %%
 %global S0 S1 damageOn
 if damage.damageOn
     % Damage dependent crack
     alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
-    if damage.phi > alfa
-        Sc = damage.Sc*min(gamma,1+beta*(damage.phi-alfa)/(1-damage.phi));
+    if damage.phi(ii) > alfa
+        Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
     else
         Sc = damage.Sc;
     end
