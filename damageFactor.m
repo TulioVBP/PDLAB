@@ -13,7 +13,7 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
     crackSegments = size(damage.crackIn,1); % At least 2
     check = zeros(length(neighIndex),crackSegments-1);
     % {Preallocate the damage factor}
-    if model.number == 3 % Lipton
+    if model.number == 3 && model.number == 6 % Lipton
         mu = zeros(length(neighIndex),3);
     else
         mu = zeros(length(neighIndex),1);
@@ -21,7 +21,6 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
     
     if damage.damageOn
         brokenBonds = damage.brokenBonds(ii,neighIndex);
-        %mu = mu_model(x,damage,model);
         % MU MODEL
          switch model.number
             case 1 %"PMB DTT"
@@ -36,6 +35,13 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
                 S1 = [-0.99 1.05*Sc]; % S1- and S1+
                 mu = (x<= S0(2)).*(x>=-1).*1 + (x > S0(2)).*(x<S1(2)).*(S1(2) - x)/(S1(2) - S0(2));
             case 3 %"Lipton Free Damage"
+               %% Ht
+               % Evaluating h
+               %xc = 0.15*10^-6;
+               xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
+               mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
+               mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
+            case 6 %"LSJ-T"
                %% Ht
                % Evaluating h
                %xc = 0.15*10^-6;
@@ -67,7 +73,9 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
         end
         if any(brokenBonds)  % Bond interceptate the initial crack (notch)
             switch model.number
-                case 3 %"Lipton Free Damage"
+               case 3 %"Lipton Free Damage"
+                    mu(brokenBonds,1) = zeros(sum(brokenBonds),1);
+               case 6 %"LSJ-T"
                     mu(brokenBonds,1) = zeros(sum(brokenBonds),1);
                otherwise              
                     mu(brokenBonds,:) = zeros(sum(brokenBonds),size(mu,2));

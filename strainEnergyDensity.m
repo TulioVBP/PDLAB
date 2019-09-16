@@ -33,7 +33,7 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             extension = dot(eta',xi')'./norma;
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*extension.^2/2;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
-        case 6 %"Linearized LPS"
+        case 7 %"Linearized LPS"
             kappa = c(1)*m/2+c(2)*m/3;
             alfa = c(2);
             w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
@@ -42,6 +42,18 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
                 W = W + kappa*theta_i^2/2;
             end
         case 3 %"Lipton Free Damage"
+            if nargin > 11 && damage.damageOn
+                noFail = damage.noFail(ii) | damage.noFail(jj);
+                XX = [historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)];
+                H = damageFactor(XX,ii,neigh_ind,damage,noFail,model);
+            else
+                H = ones(length(jj),3);
+            end
+            Slin = dot(xi',eta')'./norma.^2;
+            V_delta = pi*horizon^2;
+            w = 1/V_delta*(influenceFunction(norma,par_omega).*norma/horizon.*H(:,1).*f_potential(Slin,sqrt(norma),c,damage));
+            W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)') + 1/horizon^2*H(1,2)*g_potential(theta_i,c,damage);
+        case 6 %"LSJ-T"
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 XX = [historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)];

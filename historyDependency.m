@@ -12,6 +12,10 @@ switch model.number
             history.S = zeros(length(x),maxNeigh); % js integral
             history.theta = zeros(length(x),1); % jtheta-x integral
         %history(:,:,3) = zeros(length(x),maxNeigh); % jtheta-y integral
+    case 6%"LSJ-T"
+            history.S = zeros(length(x),maxNeigh); % js integral
+            history.theta = zeros(length(x),1); % jtheta-x integral
+        %history(:,:,3) = zeros(length(x),maxNeigh); % jtheta-y integral
     case 4 %"LPS 2D"
             history.S = zeros(length(x),maxNeigh); % js integral
             history.theta = zeros(length(x),1); % jtheta-x integral

@@ -35,8 +35,11 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                         XX = [history_upS, history.theta(ii)*ones(length(history.theta(jj)),1), history.theta(jj)]; 
                         noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
                         H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
-                        %theta(transv_ind) = sum(theta_vec.*wholeBonds);
-                        theta(transv_ind) = sum(theta_vec.*H(:,1)); % Tulio's model
+                        if ~model.dilatHt
+                            theta(transv_ind) = sum(theta_vec.*wholeBonds);
+                        else
+                            theta(transv_ind) = sum(theta_vec.*H(:,1)); % Tulio's model
+                        end
                     else
                         theta(transv_ind) = sum(theta_vec);
                     end
@@ -57,7 +60,22 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                     else
                         theta(transv_ind) = sum(theta_vec);
                     end
-                case 6%"Linearized LPS"
+                case 6 %"LSJT"
+                    V_delta = pi*horizon^2;
+                    S_linear = dot(xi',eta')'./norma.^2;
+                    theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
+                    if nargin > 10
+                        %wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
+                        historyS = history.S(ii,neigh_ind);
+                        history_upS = historyS' + js(S_linear,damage.Sc)*dt;
+                        XX = [history_upS, history.theta(ii)*ones(length(history.theta(jj)),1), history.theta(jj)]; 
+                        noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+                        H = damageFactor(XX,ii,1:length(jj),damage,noFail,model);
+                        theta(transv_ind) = sum(theta_vec.*H(:,1)); % Tulio's model
+                    else
+                        theta(transv_ind) = sum(theta_vec);
+                    end
+                case 7%"Linearized LPS"
                     theta_vec = 3/m*influenceFunction(norma,par_omega).*dot(eta',xi')'.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                     theta(transv_ind) = sum(theta_vec);
                 otherwise

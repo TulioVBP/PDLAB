@@ -1,4 +1,4 @@
-function [f,history_upS,mu] = interactionForce_Lipton(x,u,theta,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,historyS,historyTheta,noFail)
+function [f,history_upS,mu] = interactionForce_LSJT(x,u,theta,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,historyS,historyTheta,noFail)
 %% INPUT
 % x: nodes position
 % u: dof's displacement

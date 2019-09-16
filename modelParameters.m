@@ -43,6 +43,7 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.stiffnessAnal = false;
         model.dilatation = true;
         model.number = 3; 
+        model.dilatHt = false;
     case "LPS 2D"
         horizon = par_omega(1);
         alfa = 1;
@@ -81,6 +82,26 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
         end
+        
+        case "LSJ-T"
+            horizon = par_omega(1);
+            alfa = 1;
+            mm = weightedVolume(par_omega);
+            %c(1) = 8*pi*horizon^3/mm*E*1e6/(1+nu)/2; % Plane Strain
+            %c(2) =(2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu))/2; %Plane Strain
+            c(1) = 8*pi*horizon^3/mm*E*1e6/(1+nu)/2;
+            c(2) = -2*(-1 + 3*nu)/(-1 + nu^2)*(pi*horizon^3/mm)^2*E*1e6;
+            mu = E*1e6/(2*(1+nu));
+            lambda = E*1e6*nu/(1+nu)/(1-2*nu);
+            damage.Sc = sqrt(5*(1+nu)*pi*G0/12/(E*1e6)/horizon);
+            damage.thetaC = 3;
+            T = @interactionForce_LSJT;
+            model.linearity = true;
+            model.stiffnessAnal = false;
+            model.dilatation = true;
+            model.number = 6; 
+            model.dilatHt = true;
+            
         otherwise
         error("Chosen model is not implemented or it was mistyped");
 end
