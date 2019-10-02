@@ -4,7 +4,7 @@ function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,part
 N = length(idb);
 %% Damage variables 
 %{Defining cracking trespassing matrix}
-    if damage.damageOn
+    %if damage.damageOn
         crackSegments = size(damage.crackIn,1); % At least 2
         damage.checkCrack = zeros(size(history.S));
         for ii = 1:size(history.S)
@@ -26,7 +26,7 @@ N = length(idb);
             damage.brokenBonds(ii,1:length(x_j)) = brokenBonds; 
         end
         disp('Check for broken bonds done.')
-    end
+    %end
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
     phi = zeros(length(x),n_tot); % Damage index
@@ -96,6 +96,8 @@ for n = 1:n_tot
         du = -K\(bn*V);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial + du;
+        [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+        r = norm(r_vec,Inf);
     end
     % Energy
     if model.dilatation

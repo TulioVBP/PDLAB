@@ -153,7 +153,8 @@ function displacementPlot(x,u)
     zlabel uy
     set(gca,'FontSize',15)
     %% Plot displacement in the mesh
-    scaleFactor = 1e2;
+    scaleFactor = 1/5*abs(max(max(x(:,1))-min(x(:,1)),max(x(:,2))-min(x(:,2)))/max(max(u)));
+    scaleFactor = 8.374238688194315e+03;
     % Mesh
     figure
     mesh(X,Y,zeros(size(X)),'LineWidth',1)
@@ -179,16 +180,14 @@ function displacementPlot(x,u)
     grid on
     set(gca,'FontSize',13)
     
-%     % Scatter
-%     figure
-%     scatter(x(:,1),x(:,2),'b','filled')
-%     hold on
-%     scatter(x(:,1)+u(:,1)*scaleFactor,x(:,2)+u(:,2)*scaleFactor,'r','filled')
-%     legend('Reference configuration','Deformed configuration')
-%     xlabel x
-%     ylabel y
-%     set(gca,'FontSize',15)
-%     grid on
+    % Scatter
+    figure
+    scatter(x(:,1)+u(:,1)*scaleFactor,x(:,2)+u(:,2)*scaleFactor,'r','filled')
+    legend('Deformed configuration')
+    xlabel x
+    ylabel y
+    set(gca,'FontSize',15)
+    grid on
 end
 
 function damagePlot(x,phi)

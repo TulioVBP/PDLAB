@@ -29,7 +29,11 @@ function [theta, history_thetaUp] = dilatation(x,u,family,partialAreas,surfaceCo
                     S_linear = dot(xi',eta')'./norma.^2;
                     theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                     if nargin > 10
-                        wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
+                        if damage.damageOn
+                            wholeBonds = ~damage.brokenBonds(ii,neigh_ind)';
+                        else
+                            wholeBonds = ones(size(theta_vec));
+                        end
                         historyS = history.S(ii,neigh_ind);
                         history_upS = historyS' + js(S_linear,damage.Sc)*dt;
                         XX = [history_upS, history.theta(ii)*ones(length(history.theta(jj)),1), history.theta(jj)]; 
