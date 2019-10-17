@@ -2,6 +2,14 @@
 
 function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,surfaceCorrection,T,c,model,par_omega,ndof,V,damage,history,noFailZone)
 N = length(idb);
+if length(V) == 1
+   V = V*ones(length(x),1); 
+end
+% Create v_dof
+V_DOF = zeros(2*length(x),1);
+for ii = 1:length(x)
+   V_DOF([2*ii-1 2*ii]) = V(ii);  
+end
 %% Damage variables 
 %{Defining cracking trespassing matrix}
     %if damage.damageOn
@@ -49,8 +57,8 @@ for n = 1:n_tot
     %          for the load step.
     epsilon = 10^-4;
     damage.phi = phi(:,n); % Accessing current damage situation
-    [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
-    r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf)); % Normalizing the maximum residual
+    [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+    r_max = epsilon*max(norm(bn.*V_DOF,Inf),norm(r_vec-bn.*V_DOF,Inf)); % Normalizing the maximum residual
     %% Step 4 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
     u_trial = un(:,n);
     %% Step 5 - Apply Newton's method to minimize the residual.
@@ -62,7 +70,7 @@ for n = 1:n_tot
             % {Damage}
             damage.phi = phi(:,n); % Accessing current damage situation
             if ~model.stiffnessAnal 
-                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
             else
                 K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
             end
@@ -70,7 +78,7 @@ for n = 1:n_tot
             du = -K\r_vec;
             disp('Incremental solution found.')
             u_trial = u_trial + du;
-            [r_vec,history,phi(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+            [r_vec,history,phi(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
             r = norm(r_vec,Inf);
             %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
             disp("Current residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
@@ -86,17 +94,17 @@ for n = 1:n_tot
         damage.phi = phi(:,n); % Accessing current damage situation
         if n < 2 % If the model is linear, there is no need to find the matrix more than once
             if ~model.stiffnessAnal 
-                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
             else
                 K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
             end
         end
         disp('Stiffness matrix done.')
         %bn = bn*V;
-        du = -K\(bn*V);
+        du = -K\(bn.*V_DOF);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial + du;
-        [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+        [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
         r = norm(r_vec,Inf);
     end
     % Energy
@@ -106,15 +114,15 @@ for n = 1:n_tot
     for ii=1:length(x)
        dofi = dof_vec(ii,:);
        if model.dilatation
-        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:),history.theta)*V;
+        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:),history.theta)*V(ii);
        else 
-        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:))*V;
+        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:))*V(ii);
        end
        if n>1
        bn_1 = b*((n-1)/n_tot); % b_(n-1)
-       energy.EW(ii,n) = dot(bn(dofi)+bn_1(dofi),un(dofi,n)-un(dofi,n-1))/2*V + energy.EW(ii,n-1);
+       energy.EW(ii,n) = dot(bn(dofi)+bn_1(dofi),un(dofi,n)-un(dofi,n-1))/2*V(ii) + energy.EW(ii,n-1);
        else
-       energy.EW(ii,n) = dot(bn(dofi)-0,un(dofi,n)-0)/2*V;
+       energy.EW(ii,n) = dot(bn(dofi)-0,un(dofi,n)-0)/2*V(ii);
        end
     end
 end
@@ -150,7 +158,7 @@ for ii = 1:N
         partialDamage = sum(mu_j.*Vj);
         phi(ii) = 1 - partialDamage/areaTot;
 end
-f = (f + b)*V; % N
+f = (f + b).*V; % 2N
 % Change it to add boundary conditions
 penalty = 1e10;
 if ~isempty(bc_set)

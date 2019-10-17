@@ -1,10 +1,12 @@
 % Explicit time - dynamic solver
 
-function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll)
+function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll)
     ndof = 2*length(x) - size(bc_set,1);
     %% Create volume
     h = norm(x(1,:)-x(2,:));
-    V = h^2; % homogeneous volume
+    if length(A)== 1
+        A = A*ones(length(x),1); % homogeneous volume
+    end
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
     %% Verify if dt is small enough
@@ -55,7 +57,20 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
         % Initial condition
         u_n = zeros(2*length(x),length(t)); % 2*N x n  2D matrix
         v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.ffz
-        bn = body_force;%bodyForce(x,stresses,m,h,A);
+        if size(body_force,2) == 1
+            % Constant body force
+            bn = body_force;
+            flag_bf_constant = true;
+        else
+            if size(body_force,2) ~= length(t)
+                bfnew = zeros(2*length(x),length(t));
+                for iii = 1:size(body_force,1)
+                    bfnew(iii,:) = interp1(0:size(body_force,2)-1,body_force(iii,:),(0:length(t)-1)*(size(body_force,2)-1)/(length(t)-1));
+                end
+                body_force = bfnew;
+            end
+            flag_bf_constant = false;
+        end
         energy.W = zeros(length(x),length(t)); % No initial  deformation hence no initial strain energy density
         energy.KE = zeros(length(x),length(t));
         energy.EW = zeros(length(x),length(t));
@@ -77,7 +92,12 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             disp('Found a partial simulation. Continuing it...')
         end
         ind_eval = 1;
+        timerVal = tic; % Initiating another tic
         for n = n_initial:length(t)-1
+            % Instatiate body force
+            if ~flag_bf_constant
+                bn = body_force(:,n); % Improve b
+            end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 1 - Midway velocity
@@ -93,17 +113,19 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
                 u_const = u_const + bc_set(:,3)*dt; % Updating the velocity constraint nodes
                 u_n(ndof+1:end,n+1) = u_const;
             end
-            uu = u_n(:,n+1); % Vector of displacement that will be used
+            u1 = u_n(:,n);
+            u2 = u_n(:,n+1); % Vector of displacement that will be used to come back to 2D
+            
             % ---- {Evaluating dilatation} ----
             theta = zeros(length(x),1); % Preallocate theta
             damage.phi = phi(:,n); % Accessing current damage situation
             if model.dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_tempT(ii)] = dilatation(x,uu,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history,dt);
+                        [theta(ii),history_tempT(ii)] = dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history,dt);
                     end
                 else
-                    [theta,history_tempT] = dilatation(x,uu,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,dt);
+                    [theta,history_tempT] = dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,dt);
                 end
                 history.theta = history_tempT; % Assigning up-to-date history variable
             end
@@ -120,11 +142,11 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,uu,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,uu,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,V,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
                 end
             end
             % Converting the temporary variables
@@ -134,9 +156,15 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
             energy.W(:,n+1) = energy_pot;
-            % {External work}
-            energy_ext = dot(uu(dof_vec)',body_force(dof_vec)')'*V;
-            %{External work realized by the velocity constraint} - Not working
+            %% {External work}
+            if flag_bf_constant
+                % Constant body force
+                energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
+            else
+                du = u2(dof_vec) - u1(dof_vec);
+                energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+            end
+            %{External work realized by the velocity constraint} - Working
             if ~isempty(bc_set)
                 vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
                 v = bc_set(bc_set(:,3)~=0,3);
@@ -146,11 +174,11 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             end
             bf = -fn(vel_dof);
             du = v*dt;
-            add_ext = bf.*du*V;
+            add_ext = bf.*du;
             for gg = 1:length(vel_dof)
                 ind_vel = find(dof_vec == vel_dof(gg));
                 ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
-                energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg);
+                energy_ext_var(ind_vel) = energy_ext_var(ind_vel).*A(ind_vel)+ add_ext(gg);
             end
             %energy_ext_var(vel_dof) = energy_ext_var(vel_dof) + bf.*du*V;
            
@@ -160,12 +188,12 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             % Kinectic energy
             for kk = 1:length(x)
                 dofk = dof_vec(kk,:);
-                energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2*V;
+                energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
             end
             
-            % ############ COUNTING THE PROCESSING TIME #############
-            disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%")         
-
+            %% ############ COUNTING THE PROCESSING TIME #############
+            time_up = toc(timerVal);
+            disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)))         
         end
 end
 %%
@@ -187,33 +215,31 @@ function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt_crit = min(dt); % Critical time step
 end
 %%
-function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,V,body_force,theta,b_Weval,bc_set)
-   dofi = dof_vec(ii,:);
+function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
+   %dofi = dof_vec(ii,:);
    % Loop on the nodes
-   areaTot = 0; partialDamage = 0; % Instatiate for damage index
+   %areaTot = 0; partialDamage = 0; % Instatiate for damage index
    family = familyMat(ii,familyMat(ii,:)~=0);
-   f_i = 0;
+   %f_i = 0;
    history_upS = history.S(ii,:);
    %damage.phi = phi(ii);
-       neig_index = 1:length(family);
-       jj = family(neig_index);
-       % Loop on their neighbourhood
-       noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-       if model.dilatation
-          %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-          [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-       else
-          [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
-       end
-       Vj = partialAreas(ii,neig_index)';
-       lambda = surfaceCorrection(ii,neig_index)';
-       f_i = sum(fij.*Vj.*lambda);
-       %f_i = f_i + (fij)*Vj*lambda;
-       % Damage index
-       areaTot = sum(Vj);
-       partialDamage = sum(mu_j.*Vj);
-       phi_up = 1 - partialDamage/areaTot;
-        %phi(ii,n+1) = phi(ii,n+1) - (damageIndex(x,u_n(:,n+1),familyMat(ii,neig_index),partialAreas(ii,neig_index),ii,idb,noFailZone)-1); % Damage index
+   neig_index = 1:length(family);
+   jj = family(neig_index);
+   % Loop on their neighbourhood
+   noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+   if model.dilatation
+      %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
+   else
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
+   end
+   Vj = partialAreas(ii,neig_index)';
+   lambda = surfaceCorrection(ii,neig_index)';
+   f_i = sum(fij.*Vj.*lambda);
+   % Damage index
+   areaTot = sum(Vj);
+   partialDamage = sum(mu_j.*Vj);
+   phi_up = 1 - partialDamage/areaTot;
    if b_Weval
        if ~model.dilatation
            % Strain energy
@@ -222,27 +248,8 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
            W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
        end
        % Stored strain energy
-       energy_pot = W*V;
+       energy_pot = W.*A(ii);
    else
        energy_pot = 0;
    end
-   % External work
-       %energy_ext = dot(u_n(dofi),body_force(dofi))*V; % For constant body force
-       %{External work realized by the velocity constraint} - Not working
-%             vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
-%             v = bc_set(bc_set(:,3)~=0,3);
-%             if any(vel_dof == dofi(1))
-%               bf = body_force(dofi(1)) - f_i(1);
-%               du = v(vel_dof == dofi(1))*dt;
-%               energy_ext = energy_ext+bf*du*V;
-%               if any(vel_dof == dofi(2))
-%                   bf = body_force(dofi(2)) - f_i(2);
-%                   du = v(vel_dof == dofi(2))*dt;
-%                   energy_ext = energy_ext+bf*du*V;
-%               end
-%             elseif any(vel_dof == dofi(2))
-%                bf = body_force(dofi(2)) - f_i(2);
-%                du = v(vel_dof == dofi(2))*dt;
-%                energy_ext = energy_ext+bf*du*V;
-%             end
 end

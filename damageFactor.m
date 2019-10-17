@@ -25,7 +25,7 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
          switch model.number
             case 1 %"PMB DTT"
                 % Damage dependent crack
-                alfa = 0.2; beta = 0.2; gamma = 1.4;
+                alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
                 if damage.phi(ii) > alfa
                     Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
@@ -37,6 +37,7 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
             case 3 %"Lipton Free Damage"
                %% Ht
                % Evaluating h
+               %xc = 0.15;
                %xc = 0.15*10^-6;
                xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
                mu = (x<xc).*(exp(1-1./(1-(x/xc).^2.01)));
@@ -50,7 +51,7 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
                mu(isnan(mu)) = zeros(sum(sum(isnan(mu))),1);
             case 4 % "LPS 2D"
                  % Damage dependent crack
-                alfa = 0.2; beta = 0.2; gamma = 1.4;
+                 alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
                 if damage.phi(ii) > alfa
                     Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
@@ -64,6 +65,9 @@ function mu = damageFactor(x,ii,neighIndex,damage,noFail,model)
                 alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
                 if damage.phi(ii) > alfa
                     Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+                    if length(Sc)>1
+                        disp('error');
+                    end
                 else
                     Sc = damage.Sc;
                 end

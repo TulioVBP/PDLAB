@@ -1,6 +1,6 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,surfaceCorrection,T,ndof,par_omega,c,model,damage,history)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,A,surfaceCorrection,T,ndof,par_omega,c,model,damage,history)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-7; % According to the roadmap
 N = length(u);
@@ -13,6 +13,7 @@ epsilon_vector = zeros(N,1);
 %% Initialize the tangent stiffness matrix to zero
 K = zeros(N,N);
 %% Transverse each node in the discretization
+timerVal = tic;
 for ii=1:length(x)
     if model.dilatation % The system has dilatation
         transvList = [ii family(ii,family(ii,:)~=0)];
@@ -57,8 +58,8 @@ for ii=1:length(x)
                     [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
                     [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
                 end
-                f_plus = T_plus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero
-                f_minus = T_minus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*h^2; % S_max set to zero again
+                f_plus = T_plus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*A(ii); % S_max set to zero
+                f_minus = T_minus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*A(ii); % S_max set to zero again
                 f_diff = sum(f_plus - f_minus);
                 %for ss = dofk % For each displacement degree of freedom of node kk: (2*jj-1) = e1 and 2*jj = e2
                     K(dofi,rr) = f_diff'/2/epsilon; % ss+2*(1-kk) returns 1 or 2, depending if ss is the first or the second
@@ -68,7 +69,8 @@ for ii=1:length(x)
         end
     end
     if ii == floor(length(x)/2) || ii == floor(length(x)/4) || ii == 3*floor(length(x)/4)
-        disp("Constructing the stiffness matrix: " + num2str(ii/length(x)*100) + "%")
+        T_CUR = toc(timerVal);
+        disp("Constructing the stiffness matrix: " + num2str(ii/length(x)*100) + "%. ETA (s): " + num2str(T_CUR/ii*(length(x)-ii)))
     end
 end
 %% Adapting for the constrained dofs

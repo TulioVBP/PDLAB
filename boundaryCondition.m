@@ -18,7 +18,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
 % - bc_set: contains the set of constrained degrees of freedom on the first
 %           collumn and its corresponding value on the second collumn; the
 %           third collumn contains the corresponding dof velocity
-% - b: the actual body force vector
+% - bb: the actual body force vector
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
 
     %% DEFINE THE BOUNDARY CONDITIONS
@@ -72,12 +72,22 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
                 bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
             end
             
-            [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
-            bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
-            
+            if ~isempty(pc.vel) || ~isempty(pc.disp)
+                [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
+                bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
+            else
+                bc_set = [];
+            end
             % - Traction forces
             if ~isempty(pc.bodyForce)
-                B_given = pc.bodyForce(:,1:3); % [node, b_x, b_y]
+                if length(size(pc.bodyForce)) == 2
+                    % Constant body forces
+                    B_given = pc.bodyForce(:,1:3); % [node, b_x, b_y]
+                elseif length(size(pc.bodyForce)) == 3
+                    B_given = pc.bodyForce(:,1:3,:); % [node, b_x, b_y, time]
+                else
+                    error("Wrong body force vector.")
+                end
             else
                 B_given = [];
             end
@@ -109,10 +119,20 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
     % TO BE DONE
     %% DEFINE THE BODY FORCE
     [b_old,noFail] = bodyForce(x,stresses, m, h, A,tractionOpt,B_given);
-    bb = zeros(2*length(x),1);
-    for ii = 1:length(b_old)
-        dofi = [idb(2*ii-1) idb(2*ii)];
-        bb(dofi) = b_old(ii,:)'; % Assigning the body force values to the collumn vector
+    if length(size(b_old)) == 2
+        % Constant
+        bb = zeros(2*length(x),1);
+        for ii = 1:size(b_old,1)
+            dofi = [idb(2*ii-1) idb(2*ii)];
+            bb(dofi) = b_old(ii,:,:)'; % Assigning the body force values to the collumn vector
+        end
+    else
+       % Non-Constant
+        bb = zeros(2*length(x),size(b_old,3)); % 2Nxn matrix
+        for ii = 1:size(b_old,1)
+            dofi = [idb(2*ii-1) idb(2*ii)];
+            bb(dofi,:) = permute(b_old(ii,:,:),[2,1,3]); % Assigning the body force values to the collumn vector
+        end 
     end
    %% Updating no fail variable
    if ~isempty(bc_set)
@@ -127,7 +147,11 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
    figure 
    scatter(x(:,1),x(:,2),'b','filled','DisplayName','Free nodes')
    hold on
-   scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled','DisplayName','Traction force nodes')
+   if length(size(b_old)) == 2
+    scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled','DisplayName','Traction force nodes')
+   elseif length(size(pc.bodyForce)) == 3
+    scatter(x(b_old(:,1,end) ~= 0 | b_old(:,2,end)~=0,1),x(b_old(:,1,end) ~= 0 | b_old(:,2,end)~=0,2),'r','filled','DisplayName','Traction force nodes')
+   end
    if ~isempty(bc_set) 
     scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled','DisplayName','Displacement const. nodes')
     scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled','DisplayName','Velocity nodes')
@@ -136,9 +160,11 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
     %legend('Free nodes','Traction forces nodes')
    end
    if nargin > 8
+      if ~isempty(damage.crackIn)
       x_crack = damage.crackIn(:,1);
       y_crack = damage.crackIn(:,2);
       line(x_crack,y_crack,'Color','red','LineWidth',4,'DisplayName','Initial crack')
+      end
    end
    legend
    axis equal

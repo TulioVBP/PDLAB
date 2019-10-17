@@ -34,10 +34,10 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
                     % U
                     if dofi(1) <= ndof
                         % First dof of node ii is free
-                        ti1u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V; % Aii
-                        ti2u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V; % Aip
-                        tj1u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;% Aij
-                        tj2u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;% Aijp
+                        ti1u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii); % Aii
+                        ti2u = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii); % Aip
+                        tj1u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);% Aij
+                        tj2u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);% Aijp
                         A(dofi(1),dofi(1)) = A(dofi(1),dofi(1)) + ti1u;
                         A(dofi(1),dofj(1)) = tj1u;
                         A(dofi(1),dofi(2)) = A(dofi(1),dofi(2)) + ti2u;
@@ -48,10 +48,10 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
                     end
                     if dofi(2) <= ndof
                         % V
-                        ti1v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;
-                        ti2v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;
-                        tj1v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;
-                        tj2v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V;
+                        ti1v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
+                        ti2v = c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
+                        tj1v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(1))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
+                        tj2v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(normaj^2)*xi(2))*xi(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
                         A(dofi(2),dofi(1)) = A(dofi(2),dofi(1)) + ti1v;
                         A(dofi(2),dofj(1)) = tj1v;
                         A(dofi(2),dofi(2)) = A(dofi(2),dofi(2)) + ti2v;

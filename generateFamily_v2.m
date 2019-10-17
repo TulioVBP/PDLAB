@@ -1,9 +1,10 @@
-function [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,horizon,dm,option,test,PA_alg,surf_Alg)
+function [family,partialAreas,maxNeigh,surfaceCorrection] = generateFamily_v2(x,A,horizon,dm,option,test,PA_alg,surf_Alg)
 % PA-HHB IMPLEMENTATION
 % Volume correction implementation
 % INPUT : 
 %---------
 % x - Position of the nodes
+% A - Areas vector (or scalar)
 % horizon - Peridynamic horizon
 % d - number of intervals taken by horizon
 % test - boolean variable that takes true if we are performing a test on
@@ -254,7 +255,7 @@ if ~existence
                         norma = norm(xi);
                     if norma <= horizon
                             family(iI,neigh_index) = iII;
-                            partialAreas(iI,neigh_index) = h^2;
+                            partialAreas(iI,neigh_index) = A;
                             neigh_index = neigh_index+1;
                     end
                     end

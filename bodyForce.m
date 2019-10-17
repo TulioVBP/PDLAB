@@ -41,8 +41,15 @@ end
     tauxy = stresses(3);
     b = zeros(size(x));
     
-    if contains(tractionOpt,'-') && ~isempty(B_given) 
+    if contains(tractionOpt,'-') && ~isempty(B_given)
+       if length(size(B_given)) == 2
+           % Constant
             b(B_given(:,1),:) = b(B_given(:,1),:) + B_given(:,2:3);
+       else
+           b = zeros([size(x) size(B_given,3)]);
+           % Non-constant
+           b(B_given(:,1),:,:) = b(B_given(:,1),:,:) + B_given(:,2:3,:);
+       end
     else
         if contains(tractionOpt,'t')
             % Top layer
