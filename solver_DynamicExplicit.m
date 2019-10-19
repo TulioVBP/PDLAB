@@ -1,6 +1,9 @@
 % Explicit time - dynamic solver
 
-function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll)
+function [t_s,u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,data_dump)
+    if nargin < 19 % No data dump
+        data_dump = 1;
+    end
     ndof = 2*length(x) - size(bc_set,1);
     %% Create volume
     h = norm(x(1,:)-x(2,:));
@@ -53,7 +56,6 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
         %end
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
-        %W = zeros(length(x),length(t)); % No initial deformation
         % Initial condition
         u_n = zeros(2*length(x),length(t)); % 2*N x n  2D matrix
         v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.ffz
@@ -71,9 +73,14 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             end
             flag_bf_constant = false;
         end
-        energy.W = zeros(length(x),length(t)); % No initial  deformation hence no initial strain energy density
-        energy.KE = zeros(length(x),length(t));
-        energy.EW = zeros(length(x),length(t));
+        n_sample = [1 data_dump:data_dump:length(t)];
+        if n_sample(end)~=length(t)
+            n_sample = [n_sample length(t)];
+        end
+        t_s = t(n_sample);
+        energy.W = zeros(length(x),length(n_sample)); % No initial  deformation hence no initial strain energy density
+        energy.KE = zeros(length(x),length(n_sample));
+        energy.EW = zeros(length(x),length(n_sample));
         energy_ext_var = zeros(length(x),1); % External energy that takes into account variable body force (velocity constraints)
         fn = zeros(2*length(x),1); % Initial force
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
@@ -91,12 +98,11 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             n_initial = n;
             disp('Found a partial simulation. Continuing it...')
         end
-        ind_eval = 1;
         timerVal = tic; % Initiating another tic
         for n = n_initial:length(t)-1
             % Instatiate body force
             if ~flag_bf_constant
-                bn = body_force(:,n); % Improve b
+                bn = body_force(:,n); % Increment b
             end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
@@ -135,11 +141,7 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             fn = zeros(2*length(x),1); % Instatiate force vector
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
             energy_ext = zeros(length(x),1); % Pre-allocate external force 
-            b_Weval = floor(n/1) ==  ind_eval;% Deciding when to evaluate the energy
-            if b_Weval 
-                ind_eval = ind_eval +1;
-            end
-            
+            b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
             if b_parll
                 parfor ii = 1:length(x)
                    [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
@@ -155,46 +157,76 @@ function [u_n,phi,energy,history] = solver_DynamicExplicit(x,t,idb,body_force,bc
             end
             history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
-            energy.W(:,n+1) = energy_pot;
-            %% {External work}
-            if flag_bf_constant
-                % Constant body force
-                energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
-            else
-                du = u2(dof_vec) - u1(dof_vec);
-                energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
-            end
-            %{External work realized by the velocity constraint} - Working
-            if ~isempty(bc_set)
-                vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
-                v = bc_set(bc_set(:,3)~=0,3);
-            else
-                vel_dof = [];
-                v = [];
-            end
-            bf = -fn(vel_dof);
-            du = v*dt;
-            add_ext = bf.*du;
-            for gg = 1:length(vel_dof)
-                ind_vel = find(dof_vec == vel_dof(gg));
-                ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
-                energy_ext_var(ind_vel) = energy_ext_var(ind_vel).*A(ind_vel)+ add_ext(gg);
-            end
-            %energy_ext_var(vel_dof) = energy_ext_var(vel_dof) + bf.*du*V;
-           
-            energy.EW(:,n+1) = energy_ext + energy_ext_var;%+energy.EW(:,n);
             % Evaluate V(n+1)
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1) is stored in the next V(n)
-            % Kinectic energy
-            for kk = 1:length(x)
-                dofk = dof_vec(kk,:);
-                energy.KE(kk,n+1) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
+            
+            %% Evaluating energy
+            if b_Weval
+                index_s = n_sample == n+1;
+                % {Potential energy}
+                energy.W(:,index_s) = energy_pot;
+                % {External work}
+                if flag_bf_constant
+                    % Constant body force
+                    energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
+                else
+                    du = u2(dof_vec) - u1(dof_vec);
+                    energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+                end
+                % {External work realized by the velocity constraint}
+                if ~isempty(bc_set)
+                    vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
+                    v = bc_set(bc_set(:,3)~=0,3);
+                else
+                    vel_dof = [];
+                    v = [];
+                end
+                bf = -fn(vel_dof);
+                du = v*dt;
+                add_ext = bf.*du;
+                for gg = 1:length(vel_dof)
+                    ind_vel = find(dof_vec == vel_dof(gg));
+                    ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
+                    energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
+                end
+                %energy_ext_var(vel_dof) = energy_ext_var(vel_dof) + bf.*du*V;
+                energy.EW(:,index_s) = energy_ext + energy_ext_var;%+energy.EW(:,n);
+                % Kinectic energy
+                for kk = 1:length(x)
+                    dofk = dof_vec(kk,:);
+                    energy.KE(kk,index_s) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
+                end
+            else
+                 % {External incremental work only}
+                if~ flag_bf_constant
+                    du = u2(dof_vec) - u1(dof_vec);
+                    energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+                end
+                % {External work realized by the velocity constraint}
+                if ~isempty(bc_set)
+                    vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
+                    v = bc_set(bc_set(:,3)~=0,3);
+                else
+                    vel_dof = [];
+                    v = [];
+                end
+                bf = -fn(vel_dof);
+                du = v*dt;
+                add_ext = bf.*du;
+                for gg = 1:length(vel_dof)
+                    ind_vel = find(dof_vec == vel_dof(gg));
+                    ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
+                    energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
+                end
             end
             
             %% ############ COUNTING THE PROCESSING TIME #############
             time_up = toc(timerVal);
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)))         
         end
+        % Sampling the results
+        [u_n] = sampling(u_n,t,t_s);
+        [phi] = sampling(phi,t,t_s);
 end
 %%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
@@ -252,4 +284,11 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
    else
        energy_pot = 0;
    end
+end
+%% Reducing the components
+function [xs] = sampling(x,t,ts)
+    xs = zeros(size(x,1),length(ts));
+    for iii = 1:size(x,1)
+        xs(iii,:) = interp1(t,x(iii,:),ts);
+    end
 end
