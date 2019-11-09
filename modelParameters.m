@@ -86,7 +86,7 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         damage.Sc = sqrt(5*pi*G0/9/(E*1e6)/horizon);
         model.number = 5;
         % Damage dependent Sc
-        if t
+        if true
             damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency

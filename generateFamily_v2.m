@@ -260,9 +260,12 @@ if ~existence
                     end
                     end
                 end
+                display(strcat('Generating family..',num2str(iI/N*100),'%'));
              end
 %            error("Partial area algorithm not yet implemented")
     end
+    % Guaranteeing maxNeigh isn't 0
+    maxNeigh = find(sum(family)==0,1);
     %% SAVE
     if find(family(:,columns)~=0)~=0
         disp('Warning: family matrix is not big enough to acomodate all neighbours. Please check the file generateFamily.m.');
