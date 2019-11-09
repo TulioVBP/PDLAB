@@ -252,38 +252,39 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
    % Loop on the nodes
    %areaTot = 0; partialDamage = 0; % Instatiate for damage index
    family = familyMat(ii,familyMat(ii,:)~=0);
-   %f_i = 0;
+   f_i = 0; areaTot = 0; partialDamage = 0;
    history_upS = history.S(ii,:);
    %damage.phi = phi(ii);
-   neig_index = 1:length(family);
-   jj = family(neig_index);
-   % Loop on their neighbourhood
-   noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-   if model.dilatation
-      %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-   else
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
-   end
-   Vj = partialAreas(ii,neig_index)';
-   lambda = surfaceCorrection(ii,neig_index)';
-   f_i = sum(fij.*Vj.*lambda);
-   % Damage index
-   areaTot = sum(Vj);
-   partialDamage = sum(mu_j.*Vj);
-   phi_up = 1 - partialDamage/areaTot;
-   if b_Weval
-       if ~model.dilatation
-           % Strain energy
-           W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
+   for neig_index = 1:length(family)
+       jj = family(neig_index);
+       % Loop on their neighbourhood
+       noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+       if model.dilatation
+          %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
+          [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
        else
-           W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
+          [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
        end
-       % Stored strain energy
-       energy_pot = W.*A(ii);
-   else
-       energy_pot = 0;
+       Vj = partialAreas(ii,neig_index)';
+       lambda = surfaceCorrection(ii,neig_index)';
+       f_i = f_i + sum(fij*Vj*lambda);
+       % Damage index
+       areaTot = areaTot + sum(Vj);
+       partialDamage = partialDamage + mu_j*Vj;
+       if b_Weval
+           if ~model.dilatation
+               % Strain energy
+               W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
+           else
+               W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
+           end
+           % Stored strain energy
+           energy_pot = W.*A(ii);
+       else
+           energy_pot = 0;
+       end
    end
+   phi_up = 1 - partialDamage/areaTot;
 end
 %% Reducing the components
 function [xs] = sampling(x,t,ts)
