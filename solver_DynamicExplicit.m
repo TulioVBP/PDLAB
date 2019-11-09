@@ -144,7 +144,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                    [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
                 end
             else 
                 for ii = 1:length(x)
@@ -252,7 +252,7 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
    % Loop on the nodes
    %areaTot = 0; partialDamage = 0; % Instatiate for damage index
    family = familyMat(ii,familyMat(ii,:)~=0);
-   f_i = 0; areaTot = 0; partialDamage = 0;
+   f_i = 0; areaTot = 0; partialDamage = 0; energy_pot = 0;
    history_upS = history.S(ii,:);
    %damage.phi = phi(ii);
    for neig_index = 1:length(family)
@@ -267,7 +267,7 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
        end
        Vj = partialAreas(ii,neig_index)';
        lambda = surfaceCorrection(ii,neig_index)';
-       f_i = f_i + sum(fij*Vj*lambda);
+       f_i = f_i + fij*Vj*lambda;
        % Damage index
        areaTot = areaTot + sum(Vj);
        partialDamage = partialDamage + mu_j*Vj;
@@ -279,7 +279,7 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
                W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
            end
            % Stored strain energy
-           energy_pot = W.*A(ii);
+           energy_pot = energy_pot + W.*A(ii);
        else
            energy_pot = 0;
        end
