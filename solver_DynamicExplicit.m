@@ -1,6 +1,6 @@
 % Explicit time - dynamic solver
 
-function [t_s,u_n,phi,energy,history,t_up] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,data_dump)
+function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,data_dump)
     if nargin < 19 % No data dump
         data_dump = 1;
     end
