@@ -36,7 +36,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         check = zeros(size(x_j,1),crackSegments-1);
         for kk = 1:crackSegments-1
             for jj = 1:size(x_j,1)
-            [~,check(jj,kk)] = checkBondCrack(x(ii,:),x_j(jj,:),damage.crackIn(kk,:),damage.crackIn(kk+1,:));
+            [~,check(jj,kk)] = neighborhood.checkBondCrack(x(ii,:),x_j(jj,:),damage.crackIn(kk,:),damage.crackIn(kk+1,:));
             end
         end
         check = check';
