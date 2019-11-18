@@ -33,7 +33,7 @@ b_parallelComp = false; % true for parallel computation
 
 % -------------- Boundary conditions ----------------
 sigmay = 6; % [MPa] Example
-stresses = [0 sigmay 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
+astresses = [0 sigmay 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
 stress_app = '-'; %'-' means BC provided directly (use prescribedBC.m). 't', 'l', 'r' and 'b' represents top, left, right and bottom edges of retangular domain (tbr in next updates)
 pc = prescribedBC(x,stresses); % SET YOUR BCs IN THIS FUNCTION
 [ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,stresses,m,h,A,3,stress_app,pc);
