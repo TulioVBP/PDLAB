@@ -14,3 +14,6 @@ To start using PDLAB, use the template file **experiment_template.m** in the fol
 
 ## Authors and acknowledgments
 This code was developed by Tulio Patriota. Such work would not be possible without the help of Dr. Adair R. Aguiar and Dr. Pablo Seleson and their insightful comments.
+
+## License
+[MIT](https://choosealicense.com/licenses/mit/)

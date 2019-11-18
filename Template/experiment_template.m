@@ -13,6 +13,8 @@ m = 4; % mesh ration (m = horizon/h)
 h = horizon./m; % [m]
 omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - conical)
 par_omega = [horizon omega gamma];
+PA_alg = "PA-AC"; % "FA", "PA-HBB", "PA-AC"
+SE_alg = "None"; % "None", "Volume method"
 % --- Mesh -----------------
 a = 0.15; % height [m]
 b = 1; % length [m]
@@ -22,7 +24,7 @@ notch_length = 0.05; % Example 5 cm
 damage.crackIn = [-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
 % ---- MODEL ---------
 damage.damageOn = false; % True if applying damage to the model, false if not
-model.name = "PMB DTT"; % "PMB", "Linearized LPS bond-based", "Lipton Free Damage" "LPS 2D" "Linearized LPS"
+model.name = "PMB DTT"; % "PMB", "LBB", "Lipton Free Damage" "LPS 2D" "Linearized LPS"
 solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit"
 [model,c,T,damage] = models.modelParameters(model,par_omega,damage,E,nu,G0); % Check if it works    
 
@@ -37,7 +39,7 @@ pc = prescribedBC(x,stresses); % SET YOUR BCs IN THIS FUNCTION
 [ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,stresses,m,h,A,3,stress_app,pc);
 
 % -------------- GENERATE FAMILY ------------------
-[family,partialAreas,maxNeigh,surfaceCorrection] = neighborhood.generateFamily_v2(x,A,horizon,m,1,false,"PA-AC","None"); % PA Algs: FA (choose for inhomogeneous mesh), PA-HHB and PA-AC. SE Algs: "None", "Volume"
+[family,partialAreas,maxNeigh,surfaceCorrection] = neighborhood.generateFamily_v2(x,A,horizon,m,1,false,PA_alg,SE_alg); % PA Algs: FA (choose for inhomogeneous mesh), PA-HHB and PA-AC. SE Algs: "None", "Volume"
         % It is possible to save multiple family files. Each file will be
         % identified as 'familyX.mat' where X is an integer. Here, X=1
 % -------------- Generate history variables ------------------
