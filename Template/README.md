@@ -5,6 +5,7 @@ Open `experiment_template.m` to start to set up the experiment. Follow each sect
 Here we define the parameters of the simulation
 ### Material properties 
 The material properties are adimensioneless (so be consistent with units)
+
 * Young modulus 
 * Density 
 * Poisson's ratio  
