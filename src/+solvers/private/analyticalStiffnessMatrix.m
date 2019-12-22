@@ -19,7 +19,7 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
     A = zeros(2*N,2*N); % 2N GDLs
     m = weightedVolume(par_omega)*ones(length(x),1);
     switch model.name
-        case "Linearized LPS bond-based"
+        case "LBB"
             c = c(1)/2*weightedVolume(par_omega);
             for ii = 1:N
                 %node_i = ceil(ii/2); % Finding the node related to the
@@ -67,6 +67,6 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
             end
             A = -A;
         otherwise
-            disp("Model not implemented.")
+            error("Model not implemented.")
     end
 end

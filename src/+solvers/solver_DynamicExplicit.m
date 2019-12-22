@@ -16,12 +16,12 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
     dt = abs(t(2) - t(1));
     dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c,rho,model);
     dt_ratio = dt/dt_crit;
-    if dt_ratio < 1
-        disp("Given time-step " + num2str(dt) +" sec is less than the critical time-step, " + num2str(dt_crit) + ...
-            " sec, and the safety factor is " + num2str(dt_ratio) + ". The simulation should converge.")
-    else 
-       disp("Given time-step " + num2str(dt) + " sec is greater than the critical time-step, " + num2str(dt_crit) + ...
-            " sec, and the safety factor is " + num2str(dt_ratio)+ ". The simulation shall explode.")
+    if dt_ratio < 1 && dt_crit > 0
+        disp("Time-step " + num2str(dt) +" sec < critical time-step, " + num2str(dt_crit) + ...
+            " sec. Safety factor: " + num2str(dt_ratio) + ". The simulation should converge.")
+    elseif dt > 0
+       disp("Time-step " + num2str(dt) + " sec > critical time-step, " + num2str(dt_crit) + ...
+            " sec. Safety factor: " + num2str(dt_ratio)+ ". The simulation shall explode.")
     end
     %% Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
@@ -232,17 +232,21 @@ end
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt = zeros(length(x),1);
     for ii = 1:length(x)
-        familyOfI = family(ii,family(ii,:)~=0);
-        den = 0;
-        for jj = familyOfI
-            neigh_index = family(ii,:) == jj;
-            xi = x(jj,:) - x(ii,:);
-            norma = norm(xi);
-            C = c(1)*influenceFunction(norma,par_omega)*norma/norma^3*...
-            [xi(1)^2 xi(1)*xi(2); xi(1)*xi(2) xi(2)^2]; % PMB model only
-            den = den + norm(C)*partialAreas(neigh_index);
+        if model.name == "PMB" || model.name == "PMB DTT" || model.name = "LBB"
+            familyOfI = family(ii,family(ii,:)~=0);
+            den = 0;
+            for jj = familyOfI
+                neigh_index = family(ii,:) == jj;
+                xi = x(jj,:) - x(ii,:);
+                norma = norm(xi);
+                C = c(1)*influenceFunction(norma,par_omega)*norma/norma^3*...
+                [xi(1)^2 xi(1)*xi(2); xi(1)*xi(2) xi(2)^2]; % PMB model only
+                den = den + norm(C)*partialAreas(neigh_index);
+            end
+            dt(ii) = sqrt(2*rho/den);
+        else
+            break;
         end
-        dt(ii) = sqrt(2*rho/den);
     end
     dt_crit = min(dt); % Critical time step
 end
