@@ -28,6 +28,9 @@ switch option
     case 6
         % P7
         w = (1 - 35*(norma/horizon).^4 + 84*(norma/horizon).^5 - 70*(norma/horizon).^6 + 20*(norma/horizon).^7)./norma.^alfa;
+    case 7
+        % Singular
+        w = (horizon./norma-1)./norma.^alfa;
 end
 % if w < 0 || norma > horizon
 %     w = 0;

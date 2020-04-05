@@ -33,6 +33,13 @@ function [f,history_upS,mu] = interactionForce_LSJT(x,u,theta,ii,jj,dof_vec,par_
     ee = (xi)./norma; % Versor
     if nargin > 10  && damage.damageOn% Damage considered
         % ---- Evaluating the damage factor Ht
+        % Damage dependent crack
+        alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+        if damage.phi(ii) > alfa
+            Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+        else
+            Sc = damage.Sc;
+        end
         % . Evaluating js
         history_upS = historyS' + js(S,damage.Sc)*dt; % NX1
         XX = [history_upS, historyTheta(ii)*ones(length(historyTheta(jj)),1), historyTheta(jj)]; 

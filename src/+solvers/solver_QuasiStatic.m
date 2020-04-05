@@ -10,6 +10,7 @@ V_DOF = zeros(2*length(x),1);
 for ii = 1:length(x)
    V_DOF([2*ii-1 2*ii]) = V(ii);  
 end
+penalty = 1e10;
 %% Damage variables 
 %{Defining cracking trespassing matrix}
     %if damage.damageOn
@@ -41,31 +42,44 @@ end
     
 
 %% Step 1 - Initialization
-un = zeros(N,n_tot); % N= 2*nn
+un = initialU0(N, n_tot,bc_set); % N= 2*nn
 energy.W = zeros(length(x),n_tot);
 energy.KE = zeros(length(x),n_tot);
 energy.EW = zeros(length(x),n_tot);
+f_int = zeros(N,n_tot);
 % Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
+
 for n = 1:n_tot
     %% Step 2 - Update the load step n <- n + 1 and pseudo-time t. Update the boundary conditions.
     bn = b*(n/n_tot); % Partial load
+    if ~isempty(bc_set)
+        bc_setn = [bc_set(:,1),bc_set(:,2)*n/n_tot];
+    end
+    %% Step 2.5 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
+    u_trial = un(:,n);
+    if ~isempty(bc_set)
+        u_trial(ndof+1:end) = bc_setn(:,2);
+    end
     %% Step 3 - Evaluate the residual vector, r, and residual r. Determine the convergence criterion
     %          for the load step.
     epsilon = 10^-4;
     damage.phi = phi(:,n); % Accessing current damage situation
-    [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
-    r_max = epsilon*max(norm(bn.*V_DOF,Inf),norm(r_vec-bn.*V_DOF,Inf)); % Normalizing the maximum residual
-    %% Step 4 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
-    u_trial = un(:,n);
+    [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+    r_max = epsilon*max(norm(bn(1:ndof).*V_DOF(1:ndof),Inf),norm(f_int(1:ndof,n).*V_DOF(1:ndof),Inf)); % Normalizing the maximum residual
+    if r_max == 0 % No forces on the non-constrain nodes
+        r_max = 10^-4;
+    end
     %% Step 5 - Apply Newton's method to minimize the residual.
-    r = norm(r_vec,Inf);
+    r = norm(r_vec(1:ndof),Inf);
+    alpha = 1;
     % -------------------- Newton's method ----------------
     if ~model.linearity
         % Suitable for non-linear models
+        iter = 1;
         while r > r_max
             % {Damage}
             damage.phi = phi(:,n); % Accessing current damage situation
@@ -77,11 +91,12 @@ for n = 1:n_tot
             disp('Stiffness matrix done.')
             du = -K\r_vec;
             disp('Incremental solution found.')
-            u_trial = u_trial + du;
-            [r_vec,history,phi(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
-            r = norm(r_vec,Inf);
+            u_trial = u_trial + alpha*du;
+            [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+            r = norm(r_vec(1:ndof),Inf);
             %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
-            disp("Current residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
+            disp("Iter:" + int2str(iter) + " Residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
+            iter = iter + 1;
         end
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial;
@@ -89,6 +104,7 @@ for n = 1:n_tot
             un(:,n+1) = u_trial; % For the next iteration
         end
     else
+        u_trial = un(:,n);
         % Linear model
         % {Damage}
         damage.phi = phi(:,n); % Accessing current damage situation
@@ -101,15 +117,24 @@ for n = 1:n_tot
         end
         disp('Stiffness matrix done.')
         %bn = bn*V;
-        du = -K\(bn.*V_DOF);
+        ff = bn.*V_DOF;
+        if ~isempty(bc_set)
+            ff(ndof+1:end) = penalty*bc_set(:,2)*(n/n_tot);
+        end
+        du = -K\(ff);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial + du;
-        [r_vec,history,phi(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
-        r = norm(r_vec,Inf);
+        [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+        r = norm(r_vec(1:ndof),Inf);
     end
     % Energy
     if model.dilatation
         [theta,history.theta] = dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,0); 
+    end
+    if ~isempty(bc_set)
+       con_dof = idb(bc_set(:,1));
+    else
+       con_dof = [];
     end
     for ii=1:length(x)
        dofi = dof_vec(ii,:);
@@ -119,17 +144,34 @@ for n = 1:n_tot
         energy.W(ii,n) = strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:))*V(ii);
        end
        if n>1
-       bn_1 = b*((n-1)/n_tot); % b_(n-1)
-       energy.EW(ii,n) = dot(bn(dofi)+bn_1(dofi),un(dofi,n)-un(dofi,n-1))/2*V(ii) + energy.EW(ii,n-1);
+           bn_1 = b*((n-1)/n_tot); % b_(n-1)
+           % {External work realized by the displacement constraint}
+            if sum(dofi(1)==con_dof)
+                bn(dofi(1)) = -f_int(dofi(1),n);
+                bn_1(dofi(1)) = -f_int(dofi(1),n-1);
+                %du = u(con_dof,n) - u(con_dof,n-1);
+                %add_ext = bf.*du;
+            end
+            if sum(dofi(2)==con_dof)
+                bn(dofi(2)) = -f_int(dofi(2),n);
+                bn_1(dofi(2)) = -f_int(dofi(2),n-1);
+            end
+           energy.EW(ii,n) = dot(bn(dofi)+bn_1(dofi),un(dofi,n)-un(dofi,n-1))/2*V(ii) + energy.EW(ii,n-1);
        else
-       energy.EW(ii,n) = dot(bn(dofi)-0,un(dofi,n)-0)/2*V(ii);
+           if sum(dofi(1)==con_dof)
+                bn(dofi(1)) = -f_int(dofi(1),n);
+            end
+            if sum(dofi(2)==con_dof)
+                bn(dofi(2)) = -f_int(dofi(2),n);
+            end
+           energy.EW(ii,n) = dot(bn(dofi)-0,un(dofi,n)-0)/2*V(ii);
        end
     end
 end
 
 end
 
-function [f,history,phi] = getForce(x,u,T,b,familyMat,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history)
+function [f,history,phi,f_model] = getForce(x,u,T,b,familyMat,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history)
 N = length(x);
 f = zeros(size(u));
 % Evaluate dilatation
@@ -158,10 +200,17 @@ for ii = 1:N
         partialDamage = sum(mu_j.*Vj);
         phi(ii) = 1 - partialDamage/areaTot;
 end
+f_model = f; % Internal force only for all points (including b)
 f = (f + b).*V; % 2N
 % Change it to add boundary conditions
 penalty = 1e10;
 if ~isempty(bc_set)
-    f(ndof+1:end) = penalty*bc_set(:,2); % The second collumn of bc_set represents the value of the constrain
+    f(ndof+1:end) = penalty*zeros(size(bc_set(:,2))); % The second collumn of bc_set represents the value of the constrain
 end
+end
+
+function un = initialU0(N, n_tot,bc_set)
+n_con = size(bc_set,1);
+un = zeros(N,n_tot);
+%un(end-n_con+1:end,1) = bc_set(:,2)/n_tot;
 end

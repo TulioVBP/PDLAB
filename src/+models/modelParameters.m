@@ -49,6 +49,11 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.dilatation = true;
         model.number = 3; 
         model.dilatHt = false;
+        if false
+            damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
+        else
+            damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
+        end
         
     case "LPS 2D"
         %% LPS

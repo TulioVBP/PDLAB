@@ -56,6 +56,13 @@ alfa = parameters(3);
             elseif alfa == 1
                  m_anl = pi*horizon^3/9;
             end
+        case 7
+            % Singular
+            if alfa == 0
+                 m_anl = pi*horizon^4/6;
+            elseif alfa == 1
+                 m_anl = pi*horizon^3/3;
+            end
     end
     %m = m_anl*m;
 end

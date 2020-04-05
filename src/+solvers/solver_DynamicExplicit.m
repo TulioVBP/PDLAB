@@ -232,7 +232,7 @@ end
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt = zeros(length(x),1);
     for ii = 1:length(x)
-        if model.name == "PMB" || model.name == "PMB DTT" || model.name = "LBB"
+        if model.name == "PMB" || model.name == "PMB DTT" || model.name == "LBB"
             familyOfI = family(ii,family(ii,:)~=0);
             den = 0;
             for jj = familyOfI
