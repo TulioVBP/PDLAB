@@ -36,9 +36,11 @@ end
     %leftLayer = find(x(:,1) < (x_lim(1) + 3*m*h + 1e-12)); % Left layer nodes index
     %rightLayer = find(x(:,1) > (x_lim(2) - 3*m*h - 1e-12)); % Right layer nodes index
     %% Applying constant Neumann boundary conditions
-    sigmax = stresses(1);
-    sigmay = stresses(2);
-    tauxy = stresses(3);
+    if ~isempty(stresses)
+        sigmax = stresses(1);
+        sigmay = stresses(2);
+        tauxy = stresses(3);
+    end
     b = zeros(size(x));
     
     if contains(tractionOpt,'-') && ~isempty(B_given)
