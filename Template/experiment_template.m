@@ -69,6 +69,9 @@ switch solver
         n_tot = 4; % Number of load steps
         [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,T,c,model,par_omega,ndof,A,damage,history,noFailZone);
         out.x = x; out.un = u_n; out.energy = energy;
+    case "Quasi-Static Explicit"
+        [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
+                                               bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,C,beta,n_load,data_dump)
     otherwise
         error("Solver not yet implemented.")
         pause

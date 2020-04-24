@@ -153,7 +153,7 @@ function displacementPlot(x,u)
     zlabel uy
     set(gca,'FontSize',15)
     %% Plot displacement in the mesh
-    scaleFactor = 1/5*abs(max(max(x(:,1))-min(x(:,1)),max(x(:,2))-min(x(:,2)))/max(max(u)));
+    scaleFactor = 1/10*abs(max(max(x(:,1))-min(x(:,1)),max(x(:,2))-min(x(:,2)))/max(max(u)));
     %scaleFactor = 8.374238688194315e+03;
     % Mesh
     figure

@@ -126,6 +126,9 @@ switch model.number
             Sc = damage.Sc;
         end
         mu = (x<Sc) * 1;
+    case 7 % "PMB Concrete"
+        Sc = [damage.Sc damage.St];
+        mu = (x<Sc(2) & x > Sc(1))*1;
     otherwise
         mu = 1;
 end

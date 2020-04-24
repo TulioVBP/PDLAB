@@ -81,7 +81,7 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         case "PMB"
         %% PMB
         alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
-        mm = weightedVolume(par_omega);
+        mm = weightedVolume(par_omega);        
         horizon = par_omega(1);
         c(1) = 6*E/mm;
         T = @models.forces.interactionForce_PMB;
@@ -115,7 +115,22 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
             model.dilatation = true;
             model.number = 6; 
             model.dilatHt = true;
-            
+        case "PMB Concrete"
+        %% PMB
+        alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
+        mm = weightedVolume(par_omega);
+        ft = G0(1);
+        fc = G0(2);
+        horizon = par_omega(1);
+        c(1) = 6*E/mm;
+        T = @models.forces.interactionForce_PMBConcrete;
+        model.linearity = false;
+        model.stiffnessAnal = false;
+        model.dilatation = false;
+        damage.St = ft/E;
+        damage.Sc = -fc/E;
+        model.number = 7;
+        
         otherwise
         error("Chosen model is not implemented or it was mistyped");
 end
