@@ -1,12 +1,14 @@
-function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
-   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,C,beta,n_load,data_dump)
+function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
+   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,model,par_omega,history,noFailZone,damage,b_parll,beta,n_load,data_dump)
 % Explicit time solver with dynamic relaxation for quasi-static experiments
-    
-   if nargin < 19 % No data dump
-        C = 0;
+   if nargin < 18 % No data dump
         data_dump = 1;
     elseif nargin < 20
         data_dump = 1;
+   end
+   
+   if isempty(t)
+       t = 1:10000;
    end
     
     %% Create volume
@@ -16,17 +18,6 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
     end
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
-    %% Verify if dt is small enough
-    dt = abs(t(2) - t(1));
-    dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c,rho,model);
-    dt_ratio = dt/dt_crit;
-    if dt_ratio < 1 && dt_crit > 0
-        disp("Time-step " + num2str(dt) +" sec < critical time-step, " + num2str(dt_crit) + ...
-            " sec. Safety factor: " + num2str(dt_ratio) + ". The simulation should converge.")
-    elseif dt > 0
-       disp("Time-step " + num2str(dt) + " sec > critical time-step, " + num2str(dt_crit) + ...
-            " sec. Safety factor: " + num2str(dt_ratio)+ ". The simulation shall explode.")
-    end
     %% Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
@@ -55,10 +46,6 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
     end
     disp('Check for broken bonds done.')
     %% INITIALIZE SIMULATION MATRICES
-    %if b_parll
-        %poolobj = parpool(2);
-    %end
-    Minv = 1/rho; % Diagonal and with the same value: scalar
     phi = zeros(length(x),length(t)); % No initial damage
     % Initial condition
     u_n = zeros(2*length(x),length(t)); % 2*N x n  2D matrix
@@ -112,22 +99,26 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
     end
     
     timerVal = tic; % Initiating another tic
-    
+    u_load = zeros(2*length(x),n_load);
     for kk = 1:n_load
         %% #########  LOAD LOOP ##########
         bc_set_part = bc_set;
         bc_set_part(:,2) = bc_set(:,2)*kk/n_load; % Upload boundary condition
         body_force_part(:,1) = body_force*kk/n_load; % bn
-         body_force_part(:,1) = body_force*kk/n_load;
-        
         crit_var = zeros(1,length(t)-1);
+        % Density vector
+        dt = abs(t(2)-t(1));
+        lambda = evaluateLambda(x,[],ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
+        lambda_inv = 1./lambda;
+        C = 0;
+        F = zeros(2*length(x),2);
         for n = n_initial:length(t)-1
             % Instatiate body force
             bn = body_force_part; % Increment b
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 0 - Acceleration at a_n
-            an =  Minv * (fn(1:ndof) + bn(1:ndof) - C * v_n(1:ndof,1));
+            an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,1));
             % #### Step 1 - Midway velocity
             v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2 * an; % V(n+1/2)
             % #### Step 2 - Update displacement
@@ -156,6 +147,8 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
             end
 
             % ####### Step 3 - Update velocity 
+            % Storing fn
+            F(:,1) = fn + bn; % F(n)
             % {Evaluate f[n+1]}
             fn = zeros(2*length(x),1); % Instatiate force vector
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
@@ -176,10 +169,15 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
             end
             history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
+            
             % Evaluate V(n+1)
-            an =  Minv * (fn(1:ndof) + bn(1:ndof) - C * v_n(1:ndof,2)); % A n+1
+            an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,2)); % A(n+1)
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*an; % V(n+1) is stored in the next V(n)
-
+            
+            % ####### Step 5 - Determine C
+            F(:,2) = fn + bn; % F(n + 1)
+            C = evaluateDamping(lambda,u_n(:,n+1),ndof,dt,F,v_n(:,2));
+            
 %             %% Evaluating energy
 %             if b_Weval
 %                 index_s = n_sample == n+1;
@@ -242,8 +240,8 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
 
             %% ############ Verifying convergence ##########
             PHI = fn(1:ndof) + bn(1:ndof);
-            crit_var(n) = norm(PHI)/norm(bn);
-            if crit_var < beta
+            crit_var(n) = norm(PHI)/norm(bn(1:ndof));
+            if crit_var(n) < beta
                 disp("Convergence achieved for the load step " + num2str(kk) + " ...")
                 break
             else
@@ -253,7 +251,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
                    clc
                 end
                 %lineLength = fprintf("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)));
-                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". ETA: "+ num2str(time_up/n*(length(t)-n)))        
+                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". Criterion: " + crit_var(n) + ". ETA: "+ num2str(time_up/n*(length(t)-n)))        
             end
             if n == length(t)-1
                 figure
@@ -261,35 +259,23 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,i
                 hold on
                 plot(1:length(t),beta*ones(length(t),1))
                 grid on
+                xlabel('Time step')
+                ylabel('\psi')
                 pause
                 
                 %error('Failure to converge with given time steps.')
             end
-        end
-    end
-end
-%%
-function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
-    dt = zeros(length(x),1);
-    for ii = 1:length(x)
-        if model.name == "PMB" || model.name == "PMB DTT" || model.name == "LBB"
-            familyOfI = family(ii,family(ii,:)~=0);
-            den = 0;
-            for jj = familyOfI
-                neigh_index = family(ii,:) == jj;
-                xi = x(jj,:) - x(ii,:);
-                norma = norm(xi);
-                C = c(1)*influenceFunction(norma,par_omega)*norma/norma^3*...
-                [xi(1)^2 xi(1)*xi(2); xi(1)*xi(2) xi(2)^2]; % PMB model only
-                den = den + norm(C)*partialAreas(neigh_index);
+            %% Verifying rate of convergence
+            if n > 2
+                if (abs(crit_var(n) - crit_var(n-1)))/crit_var(n-1) < 10^-10
+                    error("Convergence rate is too slow and convergence criteria was not met. Conv. crit. = " + num2str(crit_var(n)));
+                end
             end
-            dt(ii) = sqrt(2*rho/den);
-        else
-            break;
         end
+        u_load(:,kk) = u_n(:,n);
     end
-    dt_crit = min(dt); % Critical time step
 end
+
 %%
 function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
    %dofi = dof_vec(ii,:);
@@ -329,10 +315,38 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
        energy_pot = 0;
    end
 end
+
 %% Reducing the components
 function [xs] = sampling(x,t,ts)
     xs = zeros(size(x,1),length(ts));
     for iii = 1:size(x,1)
         xs(iii,:) = interp1(t,x(iii,:),ts);
+    end
+end
+
+function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt)
+    % 1 - Define stiffness matrix
+    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
+    % 2 - Define lambda
+    lambda = diag(eye(ndof));
+    for ii = 1:ndof
+        lambda(ii) = lambda(ii) * (1/4*dt^2*sum(abs(K(ii,1:ndof))));
+    end
+end
+
+function C = evaluateDamping(lambda,u,ndof,dt,F,v)
+    % 4 - Define K diagonal
+    vv = v(1:ndof);
+    Kn = -(F(1:ndof,2) - F(1:ndof,1))./lambda./(dt*vv);
+    Kn (vv < 1e-14 & vv > -1e-14) = 0;
+    Kn = diag(Kn);
+    % 5 - Evaluate the damping
+    if u(1:ndof)'*Kn*u(1:ndof) < 0
+        disp("Negative Kn");
+    end
+    C = real(2*sqrt(u(1:ndof)'*Kn*u(1:ndof)/(u(1:ndof)'*u(1:ndof))));
+    disp("C is "+num2str(C));
+    if C < 0 
+        C = 0;
     end
 end
