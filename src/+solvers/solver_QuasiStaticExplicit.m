@@ -108,16 +108,21 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
         crit_var = zeros(1,length(t)-1);
         % Density vector
         dt = abs(t(2)-t(1));
-        lambda = evaluateLambda(x,[],ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
+        lambda = evaluateLambda(x,u_n(:,1),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
         lambda_inv = 1./lambda;
         C = 0;
         F = zeros(2*length(x),2);
+        c_Kneg = 0;
         for n = n_initial:length(t)-1
             % Instatiate body force
             bn = body_force_part; % Increment b
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 0 - Acceleration at a_n
+            if ~model.linearity
+                lambda = evaluateLambda(x,u_n(:,n),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
+                lambda_inv = 1./lambda;
+            end
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,1));
             % #### Step 1 - Midway velocity
             v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2 * an; % V(n+1/2)
@@ -176,7 +181,7 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             
             % ####### Step 5 - Determine C
             F(:,2) = fn + bn; % F(n + 1)
-            C = evaluateDamping(lambda,u_n(:,n+1),ndof,dt,F,v_n(:,2));
+            [C,c_Kneg] = evaluateDamping(lambda,u_n(:,n+1),ndof,dt,F,v_n(:,2),c_Kneg);
             
 %             %% Evaluating energy
 %             if b_Weval
@@ -243,6 +248,7 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             crit_var(n) = norm(PHI)/norm(bn(1:ndof));
             if crit_var(n) < beta
                 disp("Convergence achieved for the load step " + num2str(kk) + " ...")
+                disp("Number of negative K's = " + int2str(c_Kneg))
                 break
             else
                  %% ############ COUNTING THE PROCESSING TIME #############
@@ -326,7 +332,7 @@ end
 
 function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt)
     % 1 - Define stiffness matrix
-    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
+    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history);
     % 2 - Define lambda
     lambda = diag(eye(ndof));
     for ii = 1:ndof
@@ -334,7 +340,7 @@ function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrect
     end
 end
 
-function C = evaluateDamping(lambda,u,ndof,dt,F,v)
+function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     % 4 - Define K diagonal
     vv = v(1:ndof);
     Kn = -(F(1:ndof,2) - F(1:ndof,1))./lambda./(dt*vv);
@@ -342,7 +348,7 @@ function C = evaluateDamping(lambda,u,ndof,dt,F,v)
     Kn = diag(Kn);
     % 5 - Evaluate the damping
     if u(1:ndof)'*Kn*u(1:ndof) < 0
-        disp("Negative Kn");
+        count = count + 1;
     end
     C = real(2*sqrt(u(1:ndof)'*Kn*u(1:ndof)/(u(1:ndof)'*u(1:ndof))));
     disp("C is "+num2str(C));
