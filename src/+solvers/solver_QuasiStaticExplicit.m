@@ -46,9 +46,11 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
     end
     disp('Check for broken bonds done.')
     %% INITIALIZE SIMULATION MATRICES
-    phi = zeros(length(x),length(t)); % No initial damage
+    dt = abs(t(2)-t(1));
+    t_full = t(1):dt:t(end)*n_load;
+    phi = zeros(length(x),length(t_full)); % No initial damage
     % Initial condition
-    u_n = zeros(2*length(x),length(t)); % 2*N x n  2D matrix
+    u_n = zeros(2*length(x),length(t_full)); % 2*N x n  2D matrix
     v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.
     
     % Checking boundary conditions
@@ -69,11 +71,11 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
     ndof = 2*length(x) - size(bc_set,1); % Number of degree of freedoms
     
     % Defining n_sample and initial energy variables
-    n_sample = [1 data_dump:data_dump:length(t)];
-    if n_sample(end)~=length(t)
-        n_sample = [n_sample length(t)];
+    n_sample = [1 data_dump:data_dump:length(t_full)];
+    if n_sample(end)~=length(t_full)
+        n_sample = [n_sample length(t_full)];
     end
-    t_s = t(n_sample); % Sample time
+    t_s = t_full(n_sample); % Sample time
     energy.W = zeros(length(x),length(n_sample)); % No initial  deformation hence no initial strain energy density
     energy.KE = zeros(length(x),length(n_sample));
     energy.EW = zeros(length(x),length(n_sample));
@@ -100,6 +102,8 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
     
     timerVal = tic; % Initiating another tic
     u_load = zeros(2*length(x),n_load);
+    mu = cell(length(x),n_load);
+    crack_ignore = false;
     for kk = 1:n_load
         %% #########  LOAD LOOP ##########
         bc_set_part = bc_set;
@@ -107,20 +111,24 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
         body_force_part(:,1) = body_force*kk/n_load; % bn
         crit_var = zeros(1,length(t)-1);
         % Density vector
-        dt = abs(t(2)-t(1));
-        lambda = evaluateLambda(x,u_n(:,1),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
+        lambda = evaluateLambda(x,u_n(:,1),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,kk));
         lambda_inv = 1./lambda;
         C = 0;
         F = zeros(2*length(x),2);
         c_Kneg = 0;
-        for n = n_initial:length(t)-1
+        % Obtain data from previous simulation
+        if kk >1
+            mu(:,kk) = mu(:,kk-1);
+            n_initial = n+1;
+        end
+        for n = n_initial:(n_initial+length(t)-2)
             % Instatiate body force
             bn = body_force_part; % Increment b
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 0 - Acceleration at a_n
             if ~model.linearity
-                lambda = evaluateLambda(x,u_n(:,n),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt);
+                lambda = evaluateLambda(x,u_n(:,n),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,kk));
                 lambda_inv = 1./lambda;
             end
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,1));
@@ -161,11 +169,11 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
                 end
             end
             % Converting the temporary variables
@@ -174,7 +182,7 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             end
             history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
-            
+      
             % Evaluate V(n+1)
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,2)); % A(n+1)
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*an; % V(n+1) is stored in the next V(n)
@@ -247,9 +255,13 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             PHI = fn(1:ndof) + bn(1:ndof);
             crit_var(n) = norm(PHI)/norm(bn(1:ndof));
             if crit_var(n) < beta
-                disp("Convergence achieved for the load step " + num2str(kk) + " ...")
-                disp("Number of negative K's = " + int2str(c_Kneg))
-                break
+                    disp("Convergence achieved for the load step " + num2str(kk) + " ...")
+                    disp("Number of negative K's = " + int2str(c_Kneg))
+                    break
+            elseif sum(phi(:,n+1) > phi(:,n)) && n > 2 && ~crack_ignore
+                disp("Crack nucleation (propagation) observed at time step " + int2str(n))
+                crack_ignore = true;
+                disp('Ignore break and propagate simulation.')
             else
                  %% ############ COUNTING THE PROCESSING TIME #############
                 time_up = toc(timerVal);
@@ -257,9 +269,9 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                    clc
                 end
                 %lineLength = fprintf("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)));
-                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". Criterion: " + crit_var(n) + ". ETA: "+ num2str(time_up/n*(length(t)-n)))        
+                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". Criterion: " + crit_var(n) + ". ETA: "+ num2str(time_up/n*(length(t_full)-n)))        
             end
-            if n == length(t)-1
+            if n == n_initial+length(t)-1
                 figure
                 plot(1:length(t)-1,crit_var)
                 hold on
@@ -283,7 +295,7 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
 end
 
 %%
-function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
+function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
    %dofi = dof_vec(ii,:);
    % Loop on the nodes
    %areaTot = 0; partialDamage = 0; % Instatiate for damage index
@@ -330,9 +342,13 @@ function [xs] = sampling(x,t,ts)
     end
 end
 
-function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt)
+function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt,mu)
+    % 0 - Correct mu
+    if isempty(mu{1})
+        mu(:) = {1};
+    end
     % 1 - Define stiffness matrix
-    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history);
+    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
     % 2 - Define lambda
     lambda = diag(eye(ndof));
     for ii = 1:ndof
@@ -350,7 +366,7 @@ function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     if u(1:ndof)'*Kn*u(1:ndof) < 0
         count = count + 1;
     end
-    C = real(2*sqrt(u(1:ndof)'*Kn*u(1:ndof)/(u(1:ndof)'*u(1:ndof))));
+    C = abs(2*sqrt(u(1:ndof)'*Kn*u(1:ndof)/(u(1:ndof)'*u(1:ndof))));
     disp("C is "+num2str(C));
     if C < 0 
         C = 0;

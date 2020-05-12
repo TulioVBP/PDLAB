@@ -1,5 +1,5 @@
 % Function to generate the stiffness matrix for the quasi-static solver
-function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history)
+function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,mu)
 %% INPUT:
 % ------------------------------------------------------------
 % - x: position of the nodes
@@ -14,6 +14,14 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
 %% OUTPUT:
 % ------------------------------------------------------------
 % - A: PD static matrix
+
+if nargin<14
+    mu = cell(length(x),1);
+    mu(:) = {1};
+elseif isempty(mu)
+    mu = cell(length(x),1);
+    mu(:) = {1};
+end
     penalty = 1e10;
     N = size(x,1);
     A = zeros(2*N,2*N); % 2N GDLs
@@ -66,54 +74,52 @@ function A = analyticalStiffnessMatrix(x,u,ndof,idb,familySet,partialAreas,surfa
                 end
             end
             A = -A;
-        case "PMB"
+        case "PMB" % Linearized
             c = c(1)/2*weightedVolume(par_omega);
+            u = u';
             for ii = 1:N
                 %node_i = ceil(ii/2); % Finding the node related to the
                 dofi = [idb(2*ii-1) idb(2*ii)];
                 family = familySet(ii,familySet(ii,:)~=0);
-                iII = 1;
-                for jj = family % j sum
-                    dofj = [idb(2*jj-1) idb(2*jj)];
-                    eta = u(dofj,:)' - u(dofi,:)';
-                    xi = x(jj,:) - x(ii,:);
-                    M = eta+xi;
-                    normaj = norm(xi);
-                    norma_eta = norm(M);
-                    omegaj = influenceFunction(normaj,par_omega);
-                    % U
-                    if dofi(1) <= ndof
-                        % First dof of node ii is free
-                        ti1u = c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(1))*M(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii); % Aii
-                        ti2u = c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(2))*M(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii); % Aip
-                        tj1u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(1))*M(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);% Aij
-                        tj2u = -c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(2))*M(1)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);% Aijp
-                        A(dofi(1),dofi(1)) = A(dofi(1),dofi(1)) + ti1u;
-                        A(dofi(1),dofj(1)) = tj1u;
-                        A(dofi(1),dofi(2)) = A(dofi(1),dofi(2)) + ti2u;
-                        A(dofi(1),dofj(2)) = tj2u;
-                    else
-                        % Constraint nodes
-                        A(dofi(1),dofi(1)) = penalty;
-                    end
-                    if dofi(2) <= ndof
-                        % V
-                        ti1v = c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(1))*M(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
-                        ti2v = c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(2))*M(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
-                        tj1v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(1))*M(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
-                        tj2v = -c*(1/m(jj) + 1/m(ii))*(omegaj/(norma_eta).^2*M(2))*M(2)*partialAreas(ii,iII)*surfaceCorrection(ii,iII)*V(ii);
-                        A(dofi(2),dofi(1)) = A(dofi(2),dofi(1)) + ti1v;
-                        A(dofi(2),dofj(1)) = tj1v;
-                        A(dofi(2),dofi(2)) = A(dofi(2),dofi(2)) + ti2v;
-                        A(dofi(2),dofj(2)) = tj2v;
-                    else
-                        % Constraint nodes
-                        A(dofi(2),dofi(2)) = penalty;
-                    end
-
-                    % Upload the neigh index
-                    iII = iII + 1;
-                end
+                iII = 1:length(family);
+                jj = family'; % j sum
+                dofj = [idb(2*jj-1) idb(2*jj)];
+                eta = u(dofj) - u(dofi);
+                xi = x(jj,:) - x(ii,:);
+                M = eta+xi;
+                normaj = vecnorm(xi')'; 
+                norma_eta = vecnorm(M')';
+                omegaj = influenceFunction(normaj,par_omega);
+                muj = mu{ii};
+                % U
+                if dofi(1) <= ndof
+                    % First dof of node ii is free
+                    ti1u = c*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii); % Aii
+                    ti2u = c*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii); % Aip
+                    tj1u = -c*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);% Aij
+                    tj2u = -c*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);% Aijp
+                    A(dofi(1),dofi(1)) = sum(ti1u);
+                    A(dofi(1),dofj(:,1)) = tj1u';
+                    A(dofi(1),dofi(2)) = sum(ti2u);
+                    A(dofi(1),dofj(:,2)) = tj2u';
+               else
+                    % Constraint nodes
+                    A(dofi(1),dofi(1)) = penalty;
+               end
+               if dofi(2) <= ndof
+                  % V
+                   ti1v = c*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   ti2v = c*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   tj1v = -c*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   tj2v = -c*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   A(dofi(2),dofi(1)) = sum(ti1v);
+                   A(dofi(2),dofj(:,1)) = tj1v';
+                   A(dofi(2),dofi(2)) =sum(ti2v);
+                   A(dofi(2),dofj(:,2)) = tj2v';
+               else
+                    % Constraint nodes
+                    A(dofi(2),dofi(2)) = penalty;
+               end
             end
             A = -A;
         otherwise
