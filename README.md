@@ -5,7 +5,7 @@ PDLAB is a MATLAB code to simulate 2D peridynamic problems.
 
 Clone the source repository
 ```bash
-git clone https://bitbucket.org/tulio_vbp/pdlab.git
+git clone https://github.com/TulioVBP/PDLAB.git
 ```
 Add the `pdlab/src` folder to the MATLAB path.
 
