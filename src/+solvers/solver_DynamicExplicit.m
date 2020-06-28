@@ -224,6 +224,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             
             %% ############ COUNTING THE PROCESSING TIME #############
             time_up = toc(timerVal);
+            clc
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)))         
         end
         % Sampling the results
