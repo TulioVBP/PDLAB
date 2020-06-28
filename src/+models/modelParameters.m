@@ -1,6 +1,14 @@
 function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
-    switch model.name
-    case "PMB DTT"
+% INPUTS
+% - model: the constitutive model you are using. Implemented models are:
+% "DTT", "PMB", "LBB", "LSJ", "LSJ-T","LPS-T"
+% - par_omega = [horizon omega alfa]
+% - damage: struct variable with damage parameters
+% - E: Young modulus
+% - nu: Poisson's ratio
+% - G0: Energy release rate
+switch model.name
+    case "DTT"
         %% PMB DTT
         alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
         mm = weightedVolume(par_omega);
@@ -10,10 +18,17 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.linearity = false;
         model.stiffnessAnal = false;
         model.dilatation = false;
-        damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+        % --- SC
+        if par_omega(2) == 3 && par_omega(3) == 1
+            damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+        elseif par_omega(2) == 1 && par_omega(3) == 0
+            damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+        else
+            warning('Critical bond not defined.')
+        end
         model.number = 1;
         % Damage dependent Sc
-        if false
+        if damage.DD
             damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
@@ -30,7 +45,8 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.dilatation = false;
         model.number = 2;
         
-    case "Lipton Free Damage"
+        
+    case "LSJ"
         %% Lipton
         horizon = par_omega(1);
         alfa = 1;
@@ -41,21 +57,30 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         c(2) = -2*(-1 + 3*nu)/(-1 + nu^2)*(pi*horizon^3/mm)^2*E;
         mu = E/(2*(1+nu));
         lambda = E*nu/(1+nu)/(1-2*nu);
-        damage.Sc = sqrt(5*(1+nu)*pi*G0/12/(E)/horizon);
+        
+        % -- Damage criteria
+        if par_omega(2) == 3 && par_omega(3) == 1
+            damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+        elseif par_omega(2) == 1 && par_omega(3) == 0
+            damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+        else
+            warning('Critical bond not defined.')
+        end
         damage.thetaC = 3;
+        
         T = @models.forces.interactionForce_Lipton;
         model.linearity = true;
         model.stiffnessAnal = false;
         model.dilatation = true;
         model.number = 3; 
         model.dilatHt = false;
-        if false
+        if damage.DD
             damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
         end
         
-    case "LPS 2D"
+    case "LPS-T"
         %% LPS
         horizon = par_omega(1);
         alfa = 1;
@@ -68,9 +93,16 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.linearity = false;
         model.stiffnessAnal = false;
         model.dilatation = true;
-        damage.Sc = sqrt(5*(1+nu)*pi*G0/12/(E)/horizon);
+        % -- Sc
+        if par_omega(2) == 3 && par_omega(3) == 1
+            damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+        elseif par_omega(2) == 1 && par_omega(3) == 0
+            damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+        else
+            warning('Critical bond not defined.')
+        end
         % Damage dependent Sc
-        if false
+        if damage.DD
             damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
@@ -88,10 +120,19 @@ function [model,c,T,damage] = modelParameters(model,par_omega,damage,E,nu,G0)
         model.linearity = false;
         model.stiffnessAnal = true;
         model.dilatation = false;
-        damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
         model.number = 5;
+        
+        % -- Sc
+        if par_omega(2) == 3 && par_omega(3) == 1
+            damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+        elseif par_omega(2) == 1 && par_omega(3) == 0
+            damage.Sc = sqrt((1+1/3)*pi*G0*4.3/(8*E*horizon*0.66467));
+        else
+            warning('Critical bond not defined.')
+        end
+      
         % Damage dependent Sc
-        if true
+        if damage.DD
             damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
         else
             damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency

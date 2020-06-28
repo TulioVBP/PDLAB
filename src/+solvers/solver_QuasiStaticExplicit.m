@@ -1,9 +1,10 @@
 function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
-   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,model,par_omega,history,noFailZone,damage,b_parll,beta,n_load,data_dump)
+   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,model,par_omega,history,noFailZone,damage,b_parll,beta,n_load,n_iterMax,data_dump)
 % Explicit time solver with dynamic relaxation for quasi-static experiments
-   if nargin < 18 % No data dump
+   if nargin < 20 % No data dump
         data_dump = 1;
-    elseif nargin < 20
+        n_iterMax = 1000;
+    elseif nargin < 21
         data_dump = 1;
    end
    
@@ -110,18 +111,18 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
         bc_set_part(:,2) = bc_set(:,2)*kk/n_load; % Upload boundary condition
         body_force_part(:,1) = body_force*kk/n_load; % bn
         crit_var = zeros(1,length(t)-1);
+        % Obtain data from previous simulation
+        if kk >1
+            mu(:,kk) = mu(:,kk-1);
+            n_initial = n+1;
+        end
         % Density vector
         lambda = evaluateLambda(x,u_n(:,1),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,kk));
         lambda_inv = 1./lambda;
         C = 0;
         F = zeros(2*length(x),2);
         c_Kneg = 0;
-        % Obtain data from previous simulation
-        if kk >1
-            mu(:,kk) = mu(:,kk-1);
-            n_initial = n+1;
-        end
-        for n = n_initial:(n_initial+length(t)-2)
+        for n = n_initial:(n_initial+length(t)+n_iterMax*(kk==n_load)-2)
             % Instatiate body force
             bn = body_force_part; % Increment b
             %% ############ VELOCITY VERLET ALGORITHM ###############
@@ -132,6 +133,9 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                 lambda_inv = 1./lambda;
             end
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,1));
+            if sum(isnan(an)) || sum(isnan(fn(1:ndof))) || sum(sum(isnan(v_n(1:ndof,:))))
+                disp('an is nan')
+            end
             % #### Step 1 - Midway velocity
             v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2 * an; % V(n+1/2)
             % #### Step 2 - Update displacement
@@ -253,7 +257,11 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
 
             %% ############ Verifying convergence ##########
             PHI = fn(1:ndof) + bn(1:ndof);
-            crit_var(n) = norm(PHI)/norm(bn(1:ndof));
+            if norm(bn(1:ndof)) ~= 0
+                crit_var(n) = norm(PHI)/norm(bn(1:ndof));
+            else
+                crit_var(n) = 1;
+            end
             if crit_var(n) < beta
                     disp("Convergence achieved for the load step " + num2str(kk) + " ...")
                     disp("Number of negative K's = " + int2str(c_Kneg))
@@ -271,9 +279,9 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                 %lineLength = fprintf("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)));
                 disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". Criterion: " + crit_var(n) + ". ETA: "+ num2str(time_up/n*(length(t_full)-n)))        
             end
-            if n == n_initial+length(t)-1
+            if n == length(t_full)+n_iterMax
                 figure
-                plot(1:length(t)-1,crit_var)
+                plot(1:length(crit_var),crit_var)
                 hold on
                 plot(1:length(t),beta*ones(length(t),1))
                 grid on
@@ -285,7 +293,7 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             end
             %% Verifying rate of convergence
             if n > 2
-                if (abs(crit_var(n) - crit_var(n-1)))/crit_var(n-1) < 10^-10
+                if (abs(crit_var(n) - crit_var(n-1)))/crit_var(n-1) < 10^-10 && norm(bn(1:ndof)) ~= 0
                     error("Convergence rate is too slow and convergence criteria was not met. Conv. crit. = " + num2str(crit_var(n)));
                 end
             end
@@ -352,8 +360,9 @@ function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrect
     % 2 - Define lambda
     lambda = diag(eye(ndof));
     for ii = 1:ndof
-        lambda(ii) = lambda(ii) * (1/4*dt^2*sum(abs(K(ii,1:ndof))));
+        lambda(ii) = lambda(ii) * (2/4*dt^2*sum(abs(K(ii,1:ndof))));
     end
+    lambda(lambda < 1e-13) = max(lambda(lambda > 1e-13));
 end
 
 function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
@@ -368,7 +377,7 @@ function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     end
     C = abs(2*sqrt(u(1:ndof)'*Kn*u(1:ndof)/(u(1:ndof)'*u(1:ndof))));
     disp("C is "+num2str(C));
-    if C < 0 
+    if C < 0 || isnan(C)
         C = 0;
     end
 end
