@@ -375,6 +375,7 @@ n_iterMax = load_par.n_iterMax;
         end
         u_load(:,kk) = u_n(:,1);
     end
+    [phi_sample,energy,un_sample,F_load] = cap_sample(phi_sample,energy,un_sample,F_load,index_s); % Eliminating last zeros, if any
 end
 
 %%
@@ -513,4 +514,13 @@ function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,su
    
    f_i = sum(fij.*Vj.*lambda);
    
+end
+
+function [phi_sample,energy,un_sample,F_load] = cap_sample(phi_sample,energy,un_sample,F_load,index_s)
+    phi_sample = phi_sample(:,1:index_s);
+    energy.EW = energy.EW(:,1:index_s);
+    energy.KE = energy.KE(:,1:index_s);
+    energy.W = energy.W(:,1:index_s);
+    un_sample = un_sample(:,1:index_s);
+    F_load = F_load(1:index_s,:);
 end

@@ -13,19 +13,23 @@ m = 4; % mesh ration (m = horizon/h)
 h = horizon./m; % [m]
 omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - conical)
 par_omega = [horizon omega gamma];
-PA_alg = "PA-AC"; % "FA", "PA-HBB", "PA-AC"
+PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
+
 % --- Mesh -----------------
 a = 0.15; % height [m]
 b = 1; % length [m]
 [x,A] = mesh.generateMesh(h,[a b]); % Generates rectangular mesh 
+
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
 damage.crackIn = [-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.DD = false; % Damage dependent criteria
+
 % ---- MODEL ---------
-damage.damageOn = false; % True if applying damage to the model, false if not
-model.name = "PMB DTT"; % "PMB", "LBB", "Lipton Free Damage" "LPS 2D" "Linearized LPS"
-solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit"
+damage.damageOn = true; % True if applying damage to the model, false if not
+model.name = "PMB"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
+solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [model,c,T,damage] = models.modelParameters(model,par_omega,damage,E,nu,G0); % Check if it works    
 
 %% SIMULATION
@@ -70,8 +74,26 @@ switch solver
         [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,T,c,model,par_omega,ndof,A,damage,history,noFailZone);
         out.x = x; out.un = u_n; out.energy = energy;
     case "Quasi-Static Explicit"
-        [t_s,u_n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
-                                               bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,C,beta,n_load,data_dump)
+        load_par.n_iterMax = 50;
+        load_par.n_load = 100; % Number of load steps
+        CC = 'critical'; % Change to a numerical value if you want CC fixed
+        data_dump = 8; % Interval time steps to record outputs
+        beta = 5e-6; % Useful for convergence criteria
+        if true % CHANGE IF YOU WANT TO INPUT THE DENSITY INSTEAD
+            % TIME GIVEN
+            load_par.b_tgiven = true;
+            dt = 1; % Time step
+            t_tot = 30;% Final time
+            load_par.t = 0:dt:t_tot;
+        else
+            % DENSITY GIVEN
+            lambda = rho; %Alternatively, you can save a previous virtual density matrix and then load('lambda.mat','lambda'). It is usefull in convergence studies where the mesh changes.
+            load_par.b_tgiven = false;
+            load_par.rho = max(lambda);
+            load_par.t_max = 30;
+        end
+        [t_s,u_load,u_n,index_s,phi,energy,history,time_up,F_load,CC] = solvers.solver_QuasiStaticExplicit(x,idb,bodyForce,...
+                                                                       bc_set,family,A,partialAreas,surfaceCorrection,T,c,CC,model,par_omega,history,noFailZone,damage,b_parallelComp,beta,load_par,data_dump);
     otherwise
         error("Solver not yet implemented.")
         pause
@@ -83,6 +105,8 @@ switch solver
         postproc.PostProcessing_Dyn(x,u_n,n_tot,idb,energy,phi,t,t_s);
     case "Quasi-Static"
         postproc.PostProcessing(x,u_n,n_tot,idb,energy);
+    case "Quasi-Static Explicit"
+        postproc.PostProcessing(x,u_n,index_s,idb,energy,phi);
     otherwise
 end
 end

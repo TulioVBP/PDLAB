@@ -196,24 +196,24 @@ function damagePlot(x,phi)
     h = norm(x(1,:) - x(2,:));
     % Transforming into a matrix array
     [X,Y] = meshgrid(min(x(:,1)):h:max(x(:,1))+1e-13, min(x(:,2)):h:max(x(:,2))+1e-13);
-    PHI = zeros(size(X));
-    for jjj = 1:size(X,2)
-        for iii = 1:size(Y,1)
-            %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
-            %reliable
-            coord = [X(1,jjj) Y(iii,1)];
-            for ii = 1:length(x)
-               if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
-                   ind = ii;
-                   break;
-               end
+    sz = flip(size(X));
+    for n = size(phi,2)%1000:50:size(phi,2)
+        if numel(X) == length(x)
+            PHI = reshape(phi(:,n),sz)';
+        else
+            phi_temp = zeros(numel(X),1);
+            X = X';Y = Y';
+            for ii = 1:numel(X)
+                index = (x(:,1) < X(ii)+1e-13 & x(:,1) > X(ii)-1e-13) & (x(:,2) < Y(ii) + 1e-13 & x(:,2) > Y(ii) - 1e-13);
+                if sum(index)
+                    phi_temp(ii) = phi(index,n);
+                else
+                    phi_temp(ii) = NaN;
+                end
             end
-            if ~isempty(ind)
-                PHI(iii,jjj) = phi(ind);
-            else
-                disp('Error: problem with the matching condition')
-            end
-        end        
+            X = X';Y = Y';
+            PHI = reshape(phi_temp,sz)';
+        end
     end
     figure
     hh = pcolor(X,Y,PHI);
