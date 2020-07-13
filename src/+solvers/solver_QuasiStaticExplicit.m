@@ -1,16 +1,14 @@
-function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExplicit(x,t,idb,body_force,...
-   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,model,par_omega,history,noFailZone,damage,b_parll,beta,n_load,n_iterMax,data_dump)
+function [t_s,u_load,un_sample,index_s,phi_sample,energy,history,time_up,F_load,CC] = solver_QuasiStaticExplicit(x,idb,body_force,...
+   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,damping,model,par_omega,history,noFailZone,damage,b_parll,beta,load_par,data_dump)
+% Unravel load parameters
+n_load = load_par.n_load;
+n_iterMax = load_par.n_iterMax;
+
 % Explicit time solver with dynamic relaxation for quasi-static experiments
    if nargin < 20 % No data dump
         data_dump = 1;
-        n_iterMax = 1000;
-    elseif nargin < 21
-        data_dump = 1;
    end
-   
-   if isempty(t)
-       t = 1:10000;
-   end
+
     
     %% Create volume
     h = norm(x(1,:)-x(2,:));
@@ -19,11 +17,13 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
     end
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
+    
     %% Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
+    
     %% Defining cracking trespassing matrix
     crackSegments = size(damage.crackIn,1); % At least 2
     damage.checkCrack = zeros(size(history.S));
@@ -46,13 +46,49 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
         damage.brokenBonds(ii,1:length(x_j)) = brokenBonds; 
     end
     disp('Check for broken bonds done.')
+    
     %% INITIALIZE SIMULATION MATRICES
-    dt = abs(t(2)-t(1));
+    ndof = 2*length(x) - size(bc_set,1); % Number of degree of freedoms
+    u_load = zeros(2*length(x),n_load); % Displacement for load steps
+    mu = cell(length(x),n_load); % Damage factor initialization
+    damage.phi = zeros(length(x),1); % Initializing phi in the damage structure
+    
+    % Initialize time vectors and density according to this
+    if load_par.b_tgiven
+        t = load_par.t;
+        dt = abs(t(2)-t(1));
+        % Density
+        u0 = zeros(2*length(x),1);
+        lambda = evaluateLambda(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,1),T);
+        lambda_inv = 1./lambda;
+        figure
+        histogram(lambda)
+    else
+        % Density
+        rho = load_par.rho;
+        if length(rho) == 1
+            lambda = rho*ones(ndof,1);
+        else
+            lambda_full = zeros(length(rho),1);
+            for ii = 1:length(rho)
+                lambda_full(dof_vec(ii,:)) = rho(ii);
+            end
+            lambda = lambda_full(1:ndof);
+        end
+        lambda_inv = 1./lambda;
+        
+        % Time vector
+        u0 = zeros(2*length(x),1);
+        dt = evaluateDeltaT(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,lambda,mu(:,1),T);
+        t = 0:dt:load_par.t_max;
+    end
     t_full = t(1):dt:t(end)*n_load;
-    phi = zeros(length(x),length(t_full)); % No initial damage
+    t_full = [t_full t_full+dt:dt:(t_full+n_iterMax*dt)];
+    
     % Initial condition
-    u_n = zeros(2*length(x),length(t_full)); % 2*N x n  2D matrix
+    u_n = zeros(2*length(x),2); % 2*N x 2  2D matrix (length(t_full))
     v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.
+    phi = zeros(length(x),length(t_full)); % No initial damage
     
     % Checking boundary conditions
     if size(body_force,2) ~= 1
@@ -68,21 +104,27 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
         bc_set = bc_set(bc_set(:,3)==0,:); % Eliminating the dofs with velocity constraint
     end
     
-     
-    ndof = 2*length(x) - size(bc_set,1); % Number of degree of freedoms
     
-    % Defining n_sample and initial energy variables
+    % {Defining n_sample and initial energy variables
     n_sample = [1 data_dump:data_dump:length(t_full)];
     if n_sample(end)~=length(t_full)
         n_sample = [n_sample length(t_full)];
     end
     t_s = t_full(n_sample); % Sample time
+    % Maybe the above is not necessary
+    index_s = 0;
+    
     energy.W = zeros(length(x),length(n_sample)); % No initial  deformation hence no initial strain energy density
     energy.KE = zeros(length(x),length(n_sample));
     energy.EW = zeros(length(x),length(n_sample));
+    un_sample = zeros(2*length(x),length(n_sample));
     energy_ext_var = zeros(length(x),1); % External energy that takes into account variable body force (velocity constraints)
     fn = zeros(2*length(x),1); % Initial force
     u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
+    theta = zeros(length(x),1); % Preallocate theta
+    
+    F_load = zeros(length(n_sample),2);
+    phi_sample = zeros(length(x),length(n_sample));
     
     % Temporary variables
     history_tempS = history.S;
@@ -102,36 +144,36 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
     end
     
     timerVal = tic; % Initiating another tic
-    u_load = zeros(2*length(x),n_load);
-    mu = cell(length(x),n_load);
-    crack_ignore = false;
-    for kk = 1:n_load
+    b_crack = true;
+    b_load = true;
+    b_finalIter = false;
+    kk = 0;
+    bc_set_part = bc_set;
+    crit_var = zeros(1,length(t)-1);
+    c_Kneg = 0;
+    C = 0;
+    
+    while b_load
         %% #########  LOAD LOOP ##########
-        bc_set_part = bc_set;
+        kk = kk+1*(~b_finalIter);
         bc_set_part(:,2) = bc_set(:,2)*kk/n_load; % Upload boundary condition
         body_force_part(:,1) = body_force*kk/n_load; % bn
-        crit_var = zeros(1,length(t)-1);
         % Obtain data from previous simulation
         if kk >1
             mu(:,kk) = mu(:,kk-1);
             n_initial = n+1;
         end
-        % Density vector
-        lambda = evaluateLambda(x,u_n(:,1),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,kk));
-        lambda_inv = 1./lambda;
-        C = 0;
         F = zeros(2*length(x),2);
-        c_Kneg = 0;
-        for n = n_initial:(n_initial+length(t)+n_iterMax*(kk==n_load)-2)
+        
+        n_in = n_initial; n_fin = (n_initial+length(t)*(~b_finalIter)+n_iterMax*(b_finalIter)-2*(~b_finalIter));
+        
+        for n = n_in:n_fin
             % Instatiate body force
             bn = body_force_part; % Increment b
+           
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 0 - Acceleration at a_n
-            if ~model.linearity
-                lambda = evaluateLambda(x,u_n(:,n),ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,kk));
-                lambda_inv = 1./lambda;
-            end
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,1));
             if sum(isnan(an)) || sum(isnan(fn(1:ndof))) || sum(sum(isnan(v_n(1:ndof,:))))
                 disp('an is nan')
@@ -139,18 +181,18 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             % #### Step 1 - Midway velocity
             v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2 * an; % V(n+1/2)
             % #### Step 2 - Update displacement
-            u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
+            u_n(:,1) = u_n(:,2); % u(n) is stored in the u(1)
+            u_n(1:ndof,2) = u_n(1:ndof,1) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
              % ----- Solving for the displacement constraint nodes ----
             if ~isempty(u_const)
                 u_const = bc_set_part(:,2); % Defining the displacements for the nodes with no velocity
-                %u_const = u_const + bc_set(:,3)*dt; % Updating the velocity constraint nodes
-                u_n(ndof+1:end,n+1) = u_const;
+                u_n(ndof+1:end,2) = u_const;
             end
-            u1 = u_n(:,n);
-            u2 = u_n(:,n+1); % Vector of displacement that will be used to come back to 2D
+            u1 = u_n(:,1);
+            u2 = u_n(:,2); % Vector of displacement that will be used to come back to 2D
 
             % ---- {Evaluating dilatation} ----
-            theta = zeros(length(x),1); % Preallocate theta
+           
             damage.phi = phi(:,n); % Accessing current damage situation
             if model.dilatation
                 if b_parll
@@ -162,24 +204,27 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                 end
                 history.theta = history_tempT; % Assigning up-to-date history variable
             end
-
+            
             % ####### Step 3 - Update velocity 
             % Storing fn
             F(:,1) = fn + bn; % F(n)
+            
             % {Evaluate f[n+1]}
-            fn = zeros(2*length(x),1); % Instatiate force vector
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
             energy_ext = zeros(length(x),1); % Pre-allocate external force 
-            b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
+            b_sampling = rem(n+1,data_dump) == 0 || (n+1 == n_fin && b_finalIter); % Deciding when to evaluate the energy
+
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling);
+
                 end
             end
+                
             % Converting the temporary variables
             for ii = 1:length(x)
                 fn(dof_vec(ii,:)) = fn_temp(ii,:)';
@@ -193,67 +238,90 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             
             % ####### Step 5 - Determine C
             F(:,2) = fn + bn; % F(n + 1)
-            [C,c_Kneg] = evaluateDamping(lambda,u_n(:,n+1),ndof,dt,F,v_n(:,2),c_Kneg);
+            if damping == 'critical'
+                [C,c_Kneg] = evaluateDamping(lambda,u_n(:,2),ndof,dt,F,v_n(:,2),c_Kneg);
+            else
+                C = damping;
+            end
+            CC(n) = C;      
             
-%             %% Evaluating energy
-%             if b_Weval
-%                 index_s = n_sample == n+1;
-%                 % {Potential energy}
-%                 energy.W(:,index_s) = energy_pot;
-%                 % {External work}
-%                 if flag_bf_constant
-%                     % Constant body force
-%                     energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
-%                 else
-%                     du = u2(dof_vec) - u1(dof_vec);
-%                     energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
-%                 end
-%                 % {External work realized by the velocity constraint}
-%                 if ~isempty(bc_set)
-%                     vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
-%                     v = bc_set(bc_set(:,3)~=0,3);
-%                 else
-%                     vel_dof = [];
-%                     v = [];
-%                 end
-%                 bf = -fn(vel_dof);
-%                 du = v*dt;
-%                 add_ext = bf.*du;
-%                 for gg = 1:length(vel_dof)
-%                     ind_vel = find(dof_vec == vel_dof(gg));
-%                     ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
-%                     energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
-%                 end
-%                 %energy_ext_var(vel_dof) = energy_ext_var(vel_dof) + bf.*du*V;
-%                 energy.EW(:,index_s) = energy_ext + energy_ext_var;%+energy.EW(:,n);
-%                 % Kinectic energy
-%                 for kk = 1:length(x)
-%                     dofk = dof_vec(kk,:);
-%                     energy.KE(kk,index_s) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
-%                 end
-%             else
-%                  % {External incremental work only}
-%                 if~ flag_bf_constant
-%                     du = u2(dof_vec) - u1(dof_vec);
-%                     energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
-%                 end
-%                 % {External work realized by the velocity constraint}
-%                 if ~isempty(bc_set)
-%                     vel_dof = idb(bc_set(bc_set(:,3)~=0,1));
-%                     v = bc_set(bc_set(:,3)~=0,3);
-%                 else
-%                     vel_dof = [];
-%                     v = [];
-%                 end
-%                 bf = -fn(vel_dof);
-%                 du = v*dt;
-%                 add_ext = bf.*du;
-%                 for gg = 1:length(vel_dof)
-%                     ind_vel = find(dof_vec == vel_dof(gg));
-%                     ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
-%                     energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
-%                 end
-%             end
+            %% Sampling quantities
+            if b_sampling
+                index_s = index_s + 1;%n_sample == n+1;
+                % {Un sampled}
+                un_sample(:,index_s) = u_n(:,2);
+                
+                % {Force load} - EDIT HERE TO OBTAIN FORCES CROSSING A GIVEN TRANSVERSAL SECTION 
+                F_load(index_s,:) = forceDisplacement(x,u_n(:,2),familyMat,dof_vec,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta,A);
+                
+                % {Phi}
+                phi_sample(:,index_s) = phi_temp;
+                
+                % {Potential energy}
+                energy.W(:,index_s) = energy_pot;
+                
+                % {External work}
+                % Constant body force
+                energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
+                
+                % {External work realized by the velocity constraint}
+                if ~isempty(bc_set)
+                    vel_dof = idb(bc_set(bc_set(:,2)~=0,1));
+                    u_e1 = u_n(vel_dof,1);
+                    u_e2 = u_n(vel_dof,2);
+                    du = (u_e2-u_e1);
+                else
+                    vel_dof = [];
+                    du = [];
+                end
+                bf = -( F(vel_dof,2) + F(vel_dof,1) - 2*bn(vel_dof) )/2;
+                add_ext = bf.*du;
+                for gg = 1:length(vel_dof)
+                    ind_vel = find(dof_vec == vel_dof(gg));
+                    ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
+                    energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
+                end
+                energy.EW(:,index_s) = energy_ext + energy_ext_var;
+                
+                % {Kinectic energy}
+                for ll = 1:length(x)
+                    dofk = dof_vec(ll,:);
+                    if dofk(1) <= ndof
+                        rho(1) = lambda(dofk(1));
+                    else
+                        rho(1) = 0;
+                    end
+                   if dofk(2) <= ndof
+                        rho(2) = lambda(dofk(2));
+                    else
+                        rho = 0;
+                    end
+                    energy.KE(ll,index_s) =  sum(1/2*rho*v_n(dofk,1).^2.*A(ll));
+                end
+            else
+                 % {External incremental work only}
+                
+                du = u2(dof_vec) - u1(dof_vec);
+                energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+
+                % {External work realized by the velocity constraint}
+                if ~isempty(bc_set)
+                    vel_dof = idb(bc_set(bc_set(:,2)~=0,1));
+                    u_e1 = u_n(vel_dof,1);
+                    u_e2 = u_n(vel_dof,2);
+                    du = (u_e2-u_e1);
+                else
+                    vel_dof = [];
+                    du = [];
+                end
+                bf =-( F(vel_dof,2) + F(vel_dof,1) - 2*bn(vel_dof) )/2;
+                add_ext = bf.*du;
+                for gg = 1:length(vel_dof)
+                    ind_vel = find(dof_vec == vel_dof(gg));
+                    ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
+                    energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
+                end
+            end
 
             %% ############ Verifying convergence ##########
             PHI = fn(1:ndof) + bn(1:ndof);
@@ -265,10 +333,13 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
             if crit_var(n) < beta
                     disp("Convergence achieved for the load step " + num2str(kk) + " ...")
                     disp("Number of negative K's = " + int2str(c_Kneg))
+                    if kk == n_load
+                        b_load = false;
+                    end
                     break
-            elseif sum(phi(:,n+1) > phi(:,n)) && n > 2 && ~crack_ignore
+            elseif sum(phi(:,n+1) > phi(:,n)) && n > 2 && b_crack
                 disp("Crack nucleation (propagation) observed at time step " + int2str(n))
-                crack_ignore = true;
+                b_crack = false;
                 disp('Ignore break and propagate simulation.')
             else
                  %% ############ COUNTING THE PROCESSING TIME #############
@@ -277,20 +348,24 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                    clc
                 end
                 %lineLength = fprintf("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)));
-                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + ". Criterion: " + crit_var(n) + ". ETA: "+ num2str(time_up/n*(length(t_full)-n)))        
+                disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + " out of " + num2str(length(t_full)) + ". Criterion: " + crit_var(n) +...
+                    ". ETA: "+ num2str(time_up/n*(length(t_full)+n_iterMax-n)) + ". C = " + num2str(C))        
             end
-            if n == length(t_full)+n_iterMax
-                figure
-                plot(1:length(crit_var),crit_var)
-                hold on
-                plot(1:length(t),beta*ones(length(t),1))
-                grid on
-                xlabel('Time step')
-                ylabel('\psi')
-                pause
-                
-                %error('Failure to converge with given time steps.')
+            %% Conditions to finish simulation if load is applied through disp.
+            
+            if n == n_fin && b_finalIter
+                b_load = false; % Stop simulation
             end
+            
+            %% EDIT HERE YOUR CONDITION FOR FINAL ITERATION
+            if n == n_fin && (~b_crack && abs(F_load(index_s,2)) < max(F_load(:,2))*1/6) || kk == n_load 
+                b_finalIter = true;
+            end
+            
+            if ~damage.damageOn && kk == n_load && n == n_fin
+                 b_load = false;
+            end
+            
             %% Verifying rate of convergence
             if n > 2
                 if (abs(crit_var(n) - crit_var(n-1)))/crit_var(n-1) < 10^-10 && norm(bn(1:ndof)) ~= 0
@@ -298,37 +373,33 @@ function [t_s,u_load,u_n,n,phi,energy,history,time_up] = solver_QuasiStaticExpli
                 end
             end
         end
-        u_load(:,kk) = u_n(:,n);
+        u_load(:,kk) = u_n(:,1);
     end
 end
 
 %%
-function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
-   %dofi = dof_vec(ii,:);
+function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling)
    % Loop on the nodes
-   %areaTot = 0; partialDamage = 0; % Instatiate for damage index
    family = familyMat(ii,familyMat(ii,:)~=0);
-   %f_i = 0;
    history_upS = history.S(ii,:);
-   %damage.phi = phi(ii);
    neig_index = 1:length(family);
    jj = family(neig_index);
+   
    % Loop on their neighbourhood
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+   Vj = partialAreas(ii,neig_index)'; 
    if model.dilatation
-      %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),history.theta,noFail);
    else
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),noFail);
    end
-   Vj = partialAreas(ii,neig_index)';
    lambda = surfaceCorrection(ii,neig_index)';
    f_i = sum(fij.*Vj.*lambda);
    % Damage index
    areaTot = sum(Vj);
    partialDamage = sum(mu_j.*Vj);
    phi_up = 1 - partialDamage/areaTot;
-   if b_Weval
+   if b_sampling
        if ~model.dilatation
            % Strain energy
            W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
@@ -350,13 +421,17 @@ function [xs] = sampling(x,t,ts)
     end
 end
 
-function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt,mu)
+function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt,mu,T)
     % 0 - Correct mu
     if isempty(mu{1})
         mu(:) = {1};
     end
     % 1 - Define stiffness matrix
-    K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
+    if model.stiffnessAnal
+        K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
+    else
+        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+    end
     % 2 - Define lambda
     lambda = diag(eye(ndof));
     for ii = 1:ndof
@@ -364,6 +439,28 @@ function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrect
     end
     lambda(lambda < 1e-13) = max(lambda(lambda > 1e-13));
 end
+
+function dt = evaluateDeltaT(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,lambda,mu,T)
+    % 0 - Correct mu
+    if isempty(mu{1})
+        mu(:) = {1};
+    end
+    % 1 - Define stiffness matrix
+    if model.stiffnessAnal
+        K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
+    else
+        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+    end
+    % 2 - Define lambda
+    dt_vec = diag(eye(ndof));
+    for ii = 1:ndof
+        dt_vec(ii) = sqrt(4*lambda(ii)/2/sum(abs(K(ii,1:ndof))));
+    end
+    dt = min(dt_vec);
+    figure
+    histogram(dt_vec,30);
+end
+
 
 function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     % 4 - Define K diagonal
@@ -380,4 +477,40 @@ function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     if C < 0 || isnan(C)
         C = 0;
     end
+end
+
+function F = forceDisplacement(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta,V)
+   x_bound = 0.020; 
+   F = [0 0];
+   for ii = 1:length(x)
+       if x(ii,2) < x_bound-1e-13
+              family_ii_comp = family(ii,family(ii,:)>0);
+              neig_index = 1:length(family_ii_comp);
+              family_ii = family_ii_comp(x(family_ii_comp,2) > x_bound);
+              partialAreas_ii = partialAreas(ii,x(family_ii_comp,2) > x_bound);
+              surfaceCorrection_ii = surfaceCorrection(ii,x(family_ii_comp,2) > x_bound);
+              neig_index = neig_index(x(family_ii_comp,2) > x_bound);
+              
+              if ~isempty(family_ii)
+                f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,c,model,damage,dt,history,T,theta);
+                F = F + f_i*V(ii);
+              end
+       end
+   end
+end
+
+function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta)
+   jj = family();
+   % Loop on their neighbourhood
+   noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+   Vj = partialAreas';
+   if model.dilatation
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),history.theta,noFail);
+   else
+      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),noFail);
+   end
+   lambda = surfaceCorrection';
+   
+   f_i = sum(fij.*Vj.*lambda);
+   
 end

@@ -22,7 +22,11 @@ switch model.name
         if par_omega(2) == 3 && par_omega(3) == 1
             damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
         elseif par_omega(2) == 1 && par_omega(3) == 0
+            l = 4.3;
             damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+        elseif par_omega(2) == 1 && par_omega(3) == 1
+            l = 3;
+            damage.Sc = sqrt(G0*(nu+1)*pi^(3/2)/8/E*(l/horizon));
         else
             warning('Critical bond not defined.')
         end
@@ -91,13 +95,17 @@ switch model.name
         c(3) = nu;
         T = @models.forces.interactionForce_StateBased;
         model.linearity = false;
-        model.stiffnessAnal = false;
+        model.stiffnessAnal = true;
         model.dilatation = true;
         % -- Sc
         if par_omega(2) == 3 && par_omega(3) == 1
             damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
         elseif par_omega(2) == 1 && par_omega(3) == 0
-            damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+            l = 4.3;
+            damage.Sc = sqrt((1+nu)*pi*G0*l/(8*E*horizon*0.66467));
+        elseif par_omega(2) == 1 && par_omega(3) == 1
+            l = 3;
+            damage.Sc = sqrt(G0*(nu+1)*pi^(3/2)/8/E*(l/horizon));
         else
             warning('Critical bond not defined.')
         end
@@ -142,8 +150,6 @@ switch model.name
             horizon = par_omega(1);
             alfa = 1;
             mm = weightedVolume(par_omega);
-            %c(1) = 8*pi*horizon^3/mm*E*1e6/(1+nu)/2; % Plane Strain
-            %c(2) =(2*pi*horizon^3)^2/mm^2*E*1e6*(4*nu-1)/(2*(1+nu)*(1-2*nu))/2; %Plane Strain
             c(1) = 8*pi*horizon^3/mm*E/(1+nu)/2;
             c(2) = -2*(-1 + 3*nu)/(-1 + nu^2)*(pi*horizon^3/mm)^2*E;
             mu = E/(2*(1+nu));
@@ -156,6 +162,24 @@ switch model.name
             model.dilatation = true;
             model.number = 6; 
             model.dilatHt = true;
+            % -- Sc
+            if par_omega(2) == 3 && par_omega(3) == 1
+                damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+            elseif par_omega(2) == 1 && par_omega(3) == 0
+                l = 4.3;
+                damage.Sc = sqrt((1+nu)*pi*G0*l/(8*E*horizon*0.66467));
+            elseif par_omega(2) == 1 && par_omega(3) == 1
+                l = 3;
+                damage.Sc = sqrt(G0*(nu+1)*pi^(3/2)/8/E*(l/horizon));
+            else
+                warning('Critical bond not defined.')
+            end
+            % Damage dependent Sc
+            if damage.DD
+                damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
+            else
+                damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
+            end
         case "PMB Concrete"
         %% PMB
         alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|

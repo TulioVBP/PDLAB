@@ -122,6 +122,98 @@ end
                end
             end
             A = -A;
+        case "LPS-T"
+            u = u';
+            nu = c(3);
+            AA = 2*(2*nu-1)/(nu-1);
+            for ii = 1:N
+                c1_hat = (c(1) + c(2)/9*m(ii)*(-nu+2)/(2*nu-1));
+                dofi = [idb(2*ii-1) idb(2*ii)];
+                family = familySet(ii,familySet(ii,:)~=0);
+                Nj = length(family);
+                iII = 1:Nj;
+                jj = family'; % j sum
+                dofj = [idb(2*jj-1) idb(2*jj)];
+                eta = u(dofj) - u(dofi);
+                xi = x(jj,:) - x(ii,:);
+                M = eta+xi;
+                normaj = vecnorm(xi,2,2); 
+                norma_eta = vecnorm(M,2,2);
+                omegaj = influenceFunction(normaj,par_omega);
+                muj = mu{ii};
+                PSI_ij = M./norma_eta;
+                % Parameters
+                Vij = partialAreas(ii,iII)';
+                c1 = c(2)*omegaj;
+                c2 = c1_hat*AA/m(ii).*omegaj.*normaj;
+                g = omegaj.*normaj;
+                % U and V
+                if dofi(1) <= ndof || dofi(2) <= ndof
+                    % First dof of node ii is free
+  
+                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(-c2.*AA/m(ii).*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(Vij.*PSI_ij); % Aii
+                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(-c2.*AA/m(ii).*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(Vij.*PSI_ij); % Aip
+                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + c2.*AA/m(ii).*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(Vij.*PSI_ij);% Aij
+                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + c2.*AA/m(ii).*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(Vij.*PSI_ij);% Aijp
+                    
+                    for Ij = 1:length(jj)
+                        j = jj(Ij);
+                        kk  = familySet(j,familySet(j,:)~=0)';
+                        iIII = 1:length(kk);
+                        dofk = [idb(2*kk-1) idb(2*kk)];
+                        eta_k = u(dofk) - u(dofj(Ij,:));
+                        xi_k = x(kk,:) - x(j,:);
+                        M_k = eta_k+xi_k;
+                        normak = vecnorm(xi_k,2,2); 
+                        
+                        norma_etak = vecnorm(M_k,2,2);
+                        omegak = influenceFunction(normak,par_omega);
+                        muk = mu{j};
+                        PSI_jk = M_k./norma_etak;
+                        Vjk = partialAreas(j,iIII)';
+                        % Parameters
+                        c2k = c1_hat*AA/m(ii).*omegak.*normak;
+                        gk = omegak.*normak;
+                        
+                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:); 
+                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:);
+                        tk1 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        tk2 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        
+                        if dofi(1) <= ndof
+                            A(dofi(1),dofk(:,1)) = A(dofi(1),dofk(:,1)) + tk1(:,1)' * V(ii);
+                            A(dofi(1),dofk(:,2)) = A(dofi(1),dofk(:,2)) + tk2(:,1)' * V(ii);
+                        end
+                        if dofi(2) <= ndof
+                            A(dofi(2),dofk(:,1)) = A(dofi(2),dofk(:,1)) + tk1(:,2)' * V(ii);
+                            A(dofi(2),dofk(:,2)) = A(dofi(2),dofk(:,2)) + tk2(:,2)' * V(ii);
+                        end 
+                    end
+                    % U
+                    if dofi(1) <= ndof
+                        A(dofi(1),dofi(1)) = A(dofi(1),dofi(1)) + ti1(1) *V(ii) ;
+                        A(dofi(1),dofj(:,1)) = A(dofi(1),dofj(:,1)) + tj1(:,1)' * V(ii);
+                        A(dofi(1),dofi(2)) = A(dofi(1),dofi(2)) + ti2(1) * V(ii);
+                        A(dofi(1),dofj(:,2)) = A(dofi(1),dofj(:,2)) + tj2(:,1)'* V(ii);
+                    else
+                        % Constraint nodes
+                        A(dofi(1),dofi(1)) = -penalty;
+                    end
+                   % V
+                   if dofi(2) <= ndof
+                        A(dofi(2),dofi(1)) = A(dofi(2),dofi(1)) + ti1(2) *V(ii) ;
+                        A(dofi(2),dofj(:,1)) = A(dofi(2),dofj(:,1)) + tj1(:,2)' * V(ii);
+                        A(dofi(2),dofi(2)) = A(dofi(2),dofi(2)) + ti2(2) * V(ii);
+                        A(dofi(2),dofj(:,2)) = A(dofi(2),dofj(:,2)) + tj2(:,2)' * V(ii);
+                   else
+                        % Constraint nodes
+                        A(dofi(2),dofi(2)) = -penalty;
+                   end
+                else
+                    A(dofi(1),dofi(1)) = -penalty;
+                    A(dofi(2),dofi(2)) = -penalty;
+                end
+            end
         otherwise
             error("Model not implemented.")
     end
