@@ -23,10 +23,10 @@ switch model.name
             damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
         elseif par_omega(2) == 1 && par_omega(3) == 0
             l = 4.3;
-            damage.Sc = sqrt((1+nu)*pi*G0*4.3/(8*E*horizon*0.66467));
+            damage.Sc = sqrt((1+1/3)*pi*G0*4.3/(8*E*horizon*0.66467));
         elseif par_omega(2) == 1 && par_omega(3) == 1
             l = 3;
-            damage.Sc = sqrt(G0*(nu+1)*pi^(3/2)/8/E*(l/horizon));
+            damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
         else
             warning('Critical bond not defined.')
         end
@@ -134,7 +134,11 @@ switch model.name
         if par_omega(2) == 3 && par_omega(3) == 1
             damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
         elseif par_omega(2) == 1 && par_omega(3) == 0
-            damage.Sc = sqrt((1+1/3)*pi*G0*4.3/(8*E*horizon*0.66467));
+            l = 4.3;
+            damage.Sc = sqrt((1+1/3)*pi*G0*l/(8*E*horizon*0.66467));
+        elseif par_omega(2) == 1 && par_omega(3) == 1
+            l = 3;
+            damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
         else
             warning('Critical bond not defined.')
         end
