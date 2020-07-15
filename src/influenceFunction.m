@@ -10,9 +10,9 @@ option = parameters(2);
 alfa = parameters(3);
 
 switch option
-    case 1
-        l = horizon/4.3;
-        w = exp(-(norma).^2/ (l^2));
+    case 1 % Exponential
+        l = horizon/3;
+        w = exp(-(norma).^2/ (l^2))./norma.^alfa;
     case 2
         % P0
         w = 1./norma.^alfa; 

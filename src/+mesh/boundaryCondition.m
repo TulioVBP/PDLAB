@@ -147,14 +147,18 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
    figure 
    scatter(x(:,1),x(:,2),'b','filled','DisplayName','Free nodes')
    hold on
-   if length(size(b_old)) == 2
+   if length(size(b_old)) == 2 && sum(sum(b_old ~= 0))
     scatter(x(b_old(:,1) ~= 0 | b_old(:,2)~=0,1),x(b_old(:,1) ~= 0 | b_old(:,2)~=0,2),'r','filled','DisplayName','Traction force nodes')
    elseif length(size(pc.bodyForce)) == 3
     scatter(x(b_old(:,1,end) ~= 0 | b_old(:,2,end)~=0,1),x(b_old(:,1,end) ~= 0 | b_old(:,2,end)~=0,2),'r','filled','DisplayName','Traction force nodes')
    end
-   if ~isempty(bc_set) 
-    scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled','DisplayName','Displacement const. nodes')
-    scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled','DisplayName','Velocity nodes')
+   if ~isempty(bc_set)
+    if ~isempty(bc_set(bc_set(:,3)== 0,:))
+        scatter(x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)== 0,1)/2+2/3),2),'k','filled','DisplayName','Displacement const. nodes')
+    end
+    if ~isempty(bc_set(bc_set(:,3)~= 0,:))
+        scatter(x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),1),x(floor(bc_set(bc_set(:,3)~= 0,1)/2+2/3),2),'g','filled','DisplayName','Velocity nodes')
+    end
     %legend('Free nodes','Traction forces nodes','Displacement const. nodes','Velocity nodes')
    else
     %legend('Free nodes','Traction forces nodes')

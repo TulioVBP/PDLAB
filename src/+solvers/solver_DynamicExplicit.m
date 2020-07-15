@@ -61,7 +61,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.ffz
         if size(body_force,2) == 1
             % Constant body force
-            bn = body_force;
+            bn = [body_force body_force]; % n n+1
             flag_bf_constant = true;
         else
             if size(body_force,2) ~= length(t)
@@ -102,12 +102,12 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         for n = n_initial:length(t)-1
             % Instatiate body force
             if ~flag_bf_constant
-                bn = body_force(:,n); % Increment b
+                bn = body_force(:,n:n+1); % Increment b
             end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
             % #### Step 1 - Midway velocity
-            v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1/2)
+            v_n(1:ndof,2) = v_n(1:ndof,1) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof,1)); % V(n+1/2)
             % #### Step 2 - Update displacement
             u_n(1:ndof,n+1) = u_n(1:ndof,n) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
              % ----- Solving for the displacement constraint nodes ----
@@ -158,7 +158,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
             % Evaluate V(n+1)
-            v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof)); % V(n+1) is stored in the next V(n)
+            v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof,1)); % V(n+1) is stored in the next V(n) using f n+1 and b n+1
             
             %% Evaluating energy
             if b_Weval
@@ -166,12 +166,13 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                 % {Potential energy}
                 energy.W(:,index_s) = energy_pot;
                 % {External work}
+                BBN = bn(:,1);
                 if flag_bf_constant
                     % Constant body force
-                    energy_ext = dot(u2(dof_vec)',bn(dof_vec)')'.*A;
+                    energy_ext = dot(u2(dof_vec)',BBN(dof_vec)')'.*A;
                 else
                     du = u2(dof_vec) - u1(dof_vec);
-                    energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+                    energy_ext_var = energy_ext_var+dot(du',BBN(dof_vec)')'.*A;
                 end
                 % {External work realized by the velocity constraint}
                 if ~isempty(bc_set)
@@ -198,9 +199,10 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                 end
             else
                  % {External incremental work only}
+                BBN = bn(:,1);
                 if~ flag_bf_constant
                     du = u2(dof_vec) - u1(dof_vec);
-                    energy_ext_var = energy_ext_var+dot(du',bn(dof_vec)')'.*A;
+                    energy_ext_var = energy_ext_var+dot(du',BBN(dof_vec)')'.*A;
                 end
                 % {External work realized by the velocity constraint}
                 if ~isempty(bc_set)
@@ -222,6 +224,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             
             %% ############ COUNTING THE PROCESSING TIME #############
             time_up = toc(timerVal);
+            clc
             disp("Time = " + num2str(t(n)) + " secs. Percentage of the process: " + num2str(n/(length(t)-1)*100) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)))         
         end
         % Sampling the results

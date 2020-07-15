@@ -21,8 +21,12 @@ alfa = parameters(3);
     %m = ones(N,1); % Initializing the "m" vector
     switch option
         case 1
-            l = horizon/4.3;
-            m_anl = l^2 * pi *(l^2 - exp(-(horizon^2/l^2))*(l^2 + horizon^2));
+            l = horizon/3;
+            if alfa == 0
+                m_anl = l^2 * pi *(l^2 - exp(-(horizon^2/l^2))*(l^2 + horizon^2));
+            elseif alfa == 1
+                m_anl = pi^(3/2)/2*(l)^3;
+            end
         case 2
             %P0
             if alfa == 0

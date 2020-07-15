@@ -253,7 +253,7 @@ if ~existence
                         x_j = x(iII,:);
                         xi  = x_j - x_i;
                         norma = norm(xi);
-                    if norma <= horizon
+                    if norma < horizon + 1e-13
                             family(iI,neigh_index) = iII;
                             partialAreas(iI,neigh_index) = A;
                             neigh_index = neigh_index+1;

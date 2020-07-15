@@ -22,10 +22,10 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
-                p = antiderivative(s,damage,noFail,ii);
+                p = antiderivativeDTT(s,damage,noFail,ii);
             else
                 mu = ones(length(jj),1);
-                p = antiderivative(s,damage,false,ii);
+                p = antiderivativeDTT(s,damage,false,ii);
             end
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
@@ -33,14 +33,6 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             extension = dot(eta',xi')'./norma;
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*extension.^2/2;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
-        case 7 %"Linearized LPS"
-            kappa = c(1)*m/2+c(2)*m/3;
-            alfa = c(2);
-            w = alfa/2*influenceFunction(norma,par_omega)*norma^2*(dot(eta,xi)/norma^2 - theta_i/3)^2;
-            W = W + w*partialAreas(neigh_ind)*surfaceCorrection(neigh_ind);
-            if b_familyEnd
-                W = W + kappa*theta_i^2/2;
-            end
         case 3 %"Lipton Free Damage"
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
@@ -90,13 +82,24 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
             end
             w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
+        case 7 %"PMB for concrete"
+            if nargin > 11 && damage.damageOn
+                noFail = damage.noFail(ii) | damage.noFail(jj);
+                mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required
+                p = antiderivativePMB_Concrete(s,damage,noFail,ii);
+            else
+                mu = ones(length(jj),1);
+                p = antiderivativePMB_Concrete(s,damage,false,ii);
+            end
+            w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
+            W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         otherwise
     end
     %neigh_ind = neigh_ind + 1;
     %end
 end
 
-function p = antiderivative(x,damage,noFail,ii)
+function p = antiderivativeDTT(x,damage,noFail,ii)
     % Modified PMB model
     if damage.damageOn
         % Damage dependent crack
@@ -138,6 +141,20 @@ function p = antiderivativePMB(x,damage,noFail,ii)
             Sc = damage.Sc;
         end
         p = (x<Sc).*x.^2/2;
+        % {Correcting the noFail}
+        p(noFail) = x(noFail).^2/2; 
+    else
+        p = x.^2/2;
+    end
+end
+
+function p = antiderivativePMB_Concrete(x,damage,noFail,ii)
+    % PMB model
+    if damage.damageOn
+        % Damage dependent crack
+        Sc = [damage.Sc damage.St];
+        % NEW FORMULATION
+        p = (x<Sc(2) & x>Sc(1)).*x.^2/2;
         % {Correcting the noFail}
         p(noFail) = x(noFail).^2/2; 
     else
