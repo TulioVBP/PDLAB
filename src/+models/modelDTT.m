@@ -1,27 +1,25 @@
 classdef modelDTT
     properties
-        linearity = true;
-        stiffnessAnal = true;
+        linearity = false;
+        stiffnessAnal = false;
         dilatation = false;
         number = 1;
         damage;
         c;
+        history;
     end
     % Methods
     methods
-        function obj = modelDTT(E,parOmega)
+        function obj = modelDTT(E,par_omega,damage,G0)
             %% Pre Initialization %%
              % Any code not using output argument (obj)
              if nargin == 0
                 % Provide values for superclass constructor
                 % and initialize other inputs
-                args{1} = 1;
-                args{2} = [1 1 1];
-             else
-                % When nargin ~= 0, assign to cell array,
-                % which is passed to supclass constructor
-                args{1} = E;
-                args{2} = parOmega;
+                E = 1;
+                par_omega = [1 1 1];
+                damage.DD = false;
+                G0 = 1;
              end
          
              %% Object Initialization %%
@@ -32,11 +30,30 @@ classdef modelDTT
 
              %% Post Initialization %%
              % Any code, including access to object
-             mm = weightedVolume(args{2});
-             obj.c = 6*args{1}/mm;
+            horizon = par_omega(1);
+            mm = weightedVolume(par_omega);
+            obj.c = 6*E/mm;
+            if par_omega(2) == 3 && par_omega(3) == 1
+                obj.damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
+            elseif par_omega(2) == 1 && par_omega(3) == 0
+                l = 3;
+                obj.damage.Sc = sqrt((1+1/3)*pi*G0*3/(8*E*horizon*0.66467));
+            elseif par_omega(2) == 1 && par_omega(3) == 1
+                l = 3;
+                obj.damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
+            else
+                warning('Critical bond not defined.')
+            end
+            % Damage dependent Sc
+            if damage.DD
+                obj.damage.alfa = 0.2; obj.damage.beta = 0.2; obj.damage.gamma = 1.4;
+            else
+                obj.damage.alfa = 0; obj.damage.beta = 0; obj.damage.gamma = 1; % No dependency
+            end
+             
         end
         
-        function [f,history,mu] = T(x,u,ii,jj,dof_vec,par_omega,c,model,separatorDamage,damage,dt,history,noFail)
+        function [f,history,mu] = T(obj,x,u,ii,jj,dof_vec,par_omega,separatorDamage,damage,history,dt,noFail)
             %% INPUT
             % x - node position matrix
             % u - degree of freedom displacement vector
@@ -62,27 +79,17 @@ classdef modelDTT
             S = (vecnorm(eta'+xi')' - norma)./norma; % Calculate stretch
             ee = (eta + xi)./vecnorm(eta'+xi')'; % Versor
             % Updating maximum stretch
-            %if exist('history','var') ~=0
-            if nargin > 10  && damage.damageOn% Damage considered
-                S_max = history';
-                history(S>S_max) = S(S>S_max);
-                S_max = history';
-                % Evaluating the damage factor
-                mu = damageFactor(S_max,ii,1:length(jj),damage,noFail,model); % If noFail is true then we will always have mu as one
-            else % No damage considered
-                history = S;
-                mu = ones(length(S),1);
-                noFail = [];
-            end
+            history = obj.updateHistory(S,history);
+            mu = obj.damageFactor(history',ii,1:length(jj),damage,noFail);
             %% Defining fscalar
             x = S.*mu;
             if damage.damageOn
                 % Damage dependent crack
-                alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+                alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
                 if damage.phi(ii) > alfa
-                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+                    Sc = obj.damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
-                    Sc = damage.Sc;
+                    Sc = obj.damage.Sc;
                 end
                 S0 = [-0.98 0.95*Sc]; % S0- and S0+
                 S1 = [-0.99 1.05*Sc]; % S1- and S1+
@@ -97,11 +104,11 @@ classdef modelDTT
             end
             
             %% Evaluating the force interaction
-            f = c(1)*influenceFunction(norma,par_omega).*norma.*ff.*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi| 
+            f = obj.c*influenceFunction(norma,par_omega).*norma.*ff.*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi| 
 
         end
         
-        function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,c,model,damage,historyS)
+        function W = strainEnergyDensity(obj,x,u,family,partialAreas,surfaceCorrection,ii,idb,par_omega,damage,historyS)
             familySet = family(family~=0);
             dofi = [idb(2*ii-1) idb(2*ii)];
             neigh_ind = 1:length(familySet);
@@ -115,26 +122,27 @@ classdef modelDTT
             
             if  damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
-                mu = modelDTT.damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail); % NoFail not required
+                mu = obj.damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail); % NoFail not required
             else
                 noFail = [];
                 mu = ones(length(jj),1);
             end
-            p = antiderivativeDTT(s,damage,noFail,ii);
-            w = 1/2*c(1)*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
+            p = antiderivativeDTT(obj,s,damage,noFail,ii);
+            w = 1/2*obj.c*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         end
         
-        function historyS = updateHistory(S,historyS)
+        function history = updateHistory(obj,S,history)
             if nargin < 2
                 error('No history was passed as argument.')
             end
             % Updating maximum stretch
-            S_max = historyS;
-            historyS(S>S_max) = S(S>S_max);
+            S_max = history';
+            S_max(S>S_max) = S(S>S_max);
+            history = S_max';
         end
         
-        function mu = damageFactor(x,ii,neighIndex,damage,noFail)
+        function mu = damageFactor(obj,x,ii,neighIndex,damage,noFail)
             %% Input
             % x: stretch, js integral, jtheta integral ...
             % ii: node i
@@ -154,11 +162,11 @@ classdef modelDTT
             mu = zeros(length(neighIndex),1);
             if damage.damageOn
                 % Damage dependent crack
-                alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+                alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
                 if damage.phi(ii) > alfa
-                    Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+                    Sc = obj.damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
                 else
-                    Sc = damage.Sc;
+                    Sc = obj.damage.Sc;
                 end
                 S0 = [-0.98 0.95*Sc]; % S0- and S0+
                 S1 = [-0.99 1.05*Sc]; % S1- and S1+
@@ -173,19 +181,30 @@ classdef modelDTT
                 mu(noFail,:) = ones(size(mu(noFail,:)));
             end
         end
-            
+        
+        function obj = set.history(obj,values)
+            if isempty(obj.history)
+                % Initialization
+                x = values{1};
+                maxNeigh = values{2};
+                obj.history.S = zeros(length(x),maxNeigh); % S_max
+            else
+                % Update
+                obj.history.S = values;
+            end
+        end
    end
 end
 
-function p = antiderivativeDTT(x,damage,noFail,ii)
+function p = antiderivativeDTT(obj,x,damage,noFail,ii)
     % Modified PMB model
     if damage.damageOn
         % Damage dependent crack
-        alfa = damage.alfa; beta = damage.beta; gamma = damage.gamma;
+        alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
         if damage.phi(ii) > alfa
-            Sc = damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
+            Sc = obj.damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
         else
-            Sc = damage.Sc;
+            Sc = obj.damage.Sc;
         end
         S0 = [-0.98 0.95*Sc]; % S0- and S0+
         S1 = [-0.99 1.05*Sc]; % S1- and S1+

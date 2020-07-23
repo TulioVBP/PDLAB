@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.05; % [m]
+horizon = 0.02; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -15,6 +15,7 @@ omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - c
 par_omega = [horizon omega gamma];
 PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
+dt = 0.5e-6; % Time step
 
 % --- Mesh -----------------
 a = 0.15; % height [m]
@@ -28,9 +29,9 @@ damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
 damage.damageOn = true; % True if applying damage to the model, false if not
-model.name = "PMB"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
-solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
-[model,c,T,damage] = models.modelParameters(model,par_omega,damage,E,nu,G0); % Check if it works    
+model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
+solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
+[model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
 %% SIMULATION
 b_parallelComp = false; % true for parallel computation
@@ -47,19 +48,19 @@ pc = prescribedBC(x,stresses); % SET YOUR BCs IN THIS FUNCTION
         % It is possible to save multiple family files. Each file will be
         % identified as 'familyX.mat' where X is an integer. Here, X=1
 % -------------- Generate history variables ------------------
-history = models.historyDependency(x,maxNeigh,model); 
+values{1} = x; values{2} = maxNeigh; 
+modelo.history = values;  % Initialize his
 
 % -------------- SOLVER -------------------
 switch solver
     case "Dynamic/Explicit"
-        dt = 0.5e-6; % Time step
         t_tot = 500e-6;% Final time
         t = 0:dt:t_tot;
         n_tot = length(t);
         data_dump = 4; % Interval time steps to record outputs
         timeEval0 = tic;
         
-        [t_s,u_n,phi,energy] = solvers.solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parallelComp,data_dump);
+        [t_s,u_n,phi,energy] = solvers.solver_DynamicExplicit(x,t,idb,bodyForce,bc_set,family,A,partialAreas,surfaceCorrection,rho,modelo,par_omega,noFailZone,damage,b_parallelComp,data_dump);
         
         t_cpu = toc(timeEval0);       
         filename = strcat('sim_m',int2str(m),'_d',int2str(horizon*1e3),'PMB','.mat'); % Choose your file name
