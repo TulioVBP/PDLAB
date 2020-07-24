@@ -1,16 +1,16 @@
-classdef modelDTT
+classdef modelPMB
     properties
         linearity = false;
         stiffnessAnal = false;
         dilatation = false;
-        number = 1;
+        number = 2;
         damage;
         c;
         history;
     end
     % Methods
     methods
-        function obj = modelDTT(E,par_omega,damage,G0)
+        function obj = modelPMB(E,par_omega,damage,G0)
             %% Pre Initialization %%
              % Any code not using output argument (obj)
              if nargin == 0
@@ -37,7 +37,7 @@ classdef modelDTT
                 obj.damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
             elseif par_omega(2) == 1 && par_omega(3) == 0
                 l = 3;
-                obj.damage.Sc = sqrt((1+1/3)*pi*G0*3/(8*E*horizon*0.66467));
+                obj.damage.Sc = sqrt((1+1/3)*pi*G0*l/(8*E*horizon*0.66467));
             elseif par_omega(2) == 1 && par_omega(3) == 1
                 l = 3;
                 obj.damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
@@ -82,7 +82,6 @@ classdef modelDTT
             history = obj.updateHistory(S,history);
             mu = obj.damageFactor(history',ii,1:length(jj),damage,noFail);
             %% Defining fscalar
-            x = S;
             if damage.damageOn
                 % Damage dependent crack
                 alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
@@ -91,16 +90,13 @@ classdef modelDTT
                 else
                     Sc = obj.damage.Sc;
                 end
-                S0 = [-0.98 0.95*Sc]; % S0- and S0+
-                S1 = [-0.99 1.05*Sc]; % S1- and S1+
 
-                % OLD FORMULATION
-                ff = (x>S1(1)).*(x<S0(1)).*(S0(1)*(x-S1(1))./(S0(1) - S1(1))) + (x>=S0(1)).*(x<=S0(2)).*x ...
-                    + (x>S0(2)).*(x<S1(2)).*(S0(2)*(S1(2)-x)./(S1(2)-S0(2)));
+                % NEW FORMULATION
+                ff = (S < Sc).*S;
                 % Adding noFail condition
-                ff(noFail) = x(noFail);
+                ff(noFail) = S(noFail);
             else
-                ff = x;
+                ff = S;
             end
             
             %% Evaluating the force interaction
@@ -119,11 +115,9 @@ classdef modelDTT
             eta = u(dofj) - u(dofi); 
             norma = vecnorm(xi,2,2);
             s = (vecnorm(xi+eta,2,2) - norma)./norma;
-            % DAMAGE
             noFail = damage.noFail(ii) | damage.noFail(jj);
-            mu = obj.damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail); % NoFail not required
-          
-            p = antiderivativeDTT(obj,s,damage,noFail,ii);
+            mu = obj.damageFactor(historyS',ii,1:length(jj),damage,noFail);
+            p = mu.*s.^2/2;
             w = 1/2*obj.c*influenceFunction(norma,par_omega).*norma.^2.*p.*mu;
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         end
@@ -164,9 +158,8 @@ classdef modelDTT
                 else
                     Sc = obj.damage.Sc;
                 end
-                S0 = [-0.98 0.95*Sc]; % S0- and S0+
-                S1 = [-0.99 1.05*Sc]; % S1- and S1+
-                mu = (x<= S0(2)).*(x>=-1).*1 + (x > S0(2)).*(x<S1(2)).*(S1(2) - x)/(S1(2) - S0(2));
+                
+                mu = (x< Sc)*1;
             end
             % Deal with initial broken bonds
             brokenBonds = damage.brokenBonds(ii,neighIndex);

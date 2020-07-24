@@ -1,7 +1,7 @@
 % Explicit time - dynamic solver
 
 function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,rho,model,par_omega,noFailZone,damage,b_parll,data_dump)
-    if nargin < 19 % No data dump
+    if nargin < 15 % No data dump
         data_dump = 1;
     end
     ndof = 2*length(x) - size(bc_set,1);
@@ -70,7 +70,11 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             end
             flag_bf_constant = false;
         end
-        n_sample = [1 data_dump:data_dump:length(t)];
+        if data_dump > 1
+            n_sample = [1 data_dump:data_dump:length(t)];
+        else
+            n_sample = data_dump:data_dump:length(t);
+        end
         if n_sample(end)~=length(t)
             n_sample = [n_sample length(t)];
         end
@@ -83,9 +87,11 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
         % Temporary variables
         history_S = model.history.S; %
-         if model.dilatation 
+        if model.dilatation 
              history_T = model.history.theta;
-         end
+        else
+             history_T = [];
+        end
         fn_temp = zeros(size(x));
         phi_temp = zeros(length(x),1);
         
@@ -262,7 +268,7 @@ function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii
    if model.dilatation
       [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),history_T,noFail);
    else
-      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),dt,noFail);
+      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),noFail);
    end
    Vj = partialAreas(ii,neig_index)';
    lambda = surfaceCorrection(ii,neig_index)';

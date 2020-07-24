@@ -70,15 +70,13 @@ classdef modelLPST
                 elong = vecnorm(xi+eta,2,2) - vecnorm(xi,2,2);
                 S = elong./norma;
                 theta_vec = 2*(2*nu-1)/(nu-1)/m*influenceFunction(norma,par_omega).*norma.*elong.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                if damage.damageOn
-                      % Updating maximum stretch
-                      historyS = obj.updateHistory(S,obj.history.S(ii,neigh_ind)');
-                      noFail = damage.noFail(ii) | damage.noFail(jj);
-                      mu = obj.damageFactor(historyS,ii,1:length(jj),damage,noFail);
-                      theta(transv_ind) = sum(theta_vec.*mu);
-                else
-                    theta(transv_ind) = sum(theta_vec);
-                end
+                % Updating maximum stretch
+                historyS = obj.updateHistory(S,obj.history.S(ii,neigh_ind)');
+                noFail = damage.noFail(ii) | damage.noFail(jj);
+                mu = obj.damageFactor(historyS,ii,1:length(jj),damage,noFail);
+                
+                theta(transv_ind) = sum(theta_vec.*mu);
+                
                 transv_ind = transv_ind + 1;
             end
         end
@@ -111,8 +109,7 @@ classdef modelLPST
             T_ji = 2*(2*nu-1)/(nu-1)*((obj.c(1) + obj.c(2)/9*m*(-nu+2)/(2*nu-1))*influenceFunction(norma,par_omega).*mu.*norma/m).*theta(jj) ...
                 + obj.c(2)*influenceFunction(norma,par_omega).*norma.*mu.*ff;
             f = (T_ij + T_ji).*ee;
-            %mu = 1; % No damage in this model
-            %historyS = 0;
+            
         end
         
         function historyS = updateHistory(obj,S,historyS)
@@ -140,7 +137,7 @@ classdef modelLPST
             end
             
             % {Preallocate the damage factor}
-            mu = zeros(length(neighIndex),1);
+            mu = ones(length(neighIndex),1);
             if damage.damageOn
                 % Damage dependent crack
                 alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
@@ -163,7 +160,7 @@ classdef modelLPST
             end
         end
         
-        function W = strainEnergyDensity(obj,x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,damage,historyS) 
+        function W = strainEnergyDensity(obj,x,u,theta,family,partialAreas,surfaceCorrection,ii,idb,par_omega,damage,historyS,historyT) 
             familySet = family(family~=0);
             dofi = [idb(2*ii-1) idb(2*ii)];
             m = weightedVolume(par_omega);
@@ -178,13 +175,10 @@ classdef modelLPST
             eta = u(dofj) - u(dofi); 
             norma = vecnorm(xi')';
             s = (vecnorm(xi'+eta')' - norma)./norma;
-            if damage.damageOn
-                noFail = damage.noFail(ii) | damage.noFail(jj);
-                mu = obj.damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail); % NoFail not required
-            else
-                noFail = [];
-                mu = ones(length(jj),1);
-            end
+            
+            noFail = damage.noFail(ii) | damage.noFail(jj);
+            mu = obj.damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail); % NoFail not required
+            
             p = antiderivativeDTT(obj,s,damage,noFail,ii);
             nu = obj.c(3);
             w = obj.c(2)/2*influenceFunction(norma,par_omega).*norma.^2.*(2*p).*mu;

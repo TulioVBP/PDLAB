@@ -69,14 +69,13 @@ classdef modelLSJT
                 V_delta = pi*horizon^2;
                 S_linear = dot(xi',eta')'./norma.^2;
                 theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
-                if damage.damageOn
-                    Sc = obj.damage_dependent(damage.phi(ii));
-                    history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
-                    XX = {history_upS, historyT(ii), historyT(jj)}; 
-                    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-                    [H,~,~] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
-                    theta(transv_ind) = sum(theta_vec.*H); % Tulio's model
-                end
+                % DAMAGE
+                Sc = obj.damage_dependent(damage.phi(ii));
+                history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
+                XX = {history_upS, historyT(ii), historyT(jj)}; 
+                noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+                [H,~,~] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
+                theta(transv_ind) = sum(theta_vec.*H); % Tulio's model
                 transv_ind = transv_ind + 1;
             end
             historyT = obj.updateHistoryT(theta(transvList),historyT);
@@ -116,16 +115,13 @@ classdef modelLSJT
             norma = vecnorm(xi')'; 
             S = dot(eta',xi')'./norma.^2; % Calculate stretch - linear
             ee = (xi)./norma; % Versor
-            if nargin > 10  && damage.damageOn% Damage considered
-                % . Evaluating js
-                Sc = obj.damage_dependent(damage.phi(ii));
-                historyS = obj.updateHistory(S,historyS',Sc); % NX1
-                XX = {historyS, historyTheta(ii), historyTheta(jj)}; 
-                [Ht,Hd_x,Hd_y] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
-            else
-                historyS = 0;
-                H = ones(length(jj),3);
-            end
+            
+            % . Evaluating js
+            Sc = obj.damage_dependent(damage.phi(ii));
+            historyS = obj.updateHistory(S,historyS',Sc); % NX1
+            XX = {historyS, historyTheta(ii), historyTheta(jj)}; 
+            [Ht,Hd_x,Hd_y] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
+            
             historyS = historyS';
             %% Evaluating the force interaction
             V_delta = pi*horizon^2; % Not sure if this is the right expression
@@ -176,9 +172,12 @@ classdef modelLSJT
             end
             
             % HT
-            xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
-            HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
-            HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
+            HT = ones(length(x{1}),1);
+            if damage.damageOn
+                xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
+                HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
+                HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
+            end
             % {HD ALWAYS ONE}
             HDi = 1;
             HDj = ones(length(x{3}),1);
@@ -205,16 +204,11 @@ classdef modelLSJT
             u = u';
             eta = u(dofj) - u(dofi); 
             norma = vecnorm(xi')';
-            if nargin > 11 && damage.damageOn
-                noFail = damage.noFail(ii) | damage.noFail(jj);
-                XX = {historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)};
-                [Ht,Hd_x,~] = obj.damageFactor(XX,ii,neigh_ind,damage,noFail);
-                Sc = obj.damage_dependent(damage.phi(ii));
-            else
-                Ht = 1;
-                Hd_x = 1;
-                Sc = obj.damage.Sc;
-            end
+            noFail = damage.noFail(ii) | damage.noFail(jj);
+            XX = {historyS(neigh_ind)', historyT(ii)*ones(length(jj),1),historyT(jj)};
+            [Ht,Hd_x,~] = obj.damageFactor(XX,ii,neigh_ind,damage,noFail);
+            Sc = obj.damage_dependent(damage.phi(ii));
+            
             Slin = dot(xi',eta')'./norma.^2;
             V_delta = pi*horizon^2;
             w = 1/V_delta*(influenceFunction(norma,par_omega).*norma/horizon.*Ht.*f_potential(Slin,sqrt(norma),obj.c,damage,Sc));

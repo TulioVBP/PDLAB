@@ -12,7 +12,6 @@ function [model,damage,modelo] = modelParameters(model,par_omega,damage,E,nu,G0,
 switch model.name
     case "DTT"
         %% PMB DTT
-        horizon = par_omega(1);
         modelo = models.modelDTT(E,par_omega,damage,G0);
         
     case "LBB"
@@ -58,50 +57,11 @@ switch model.name
         %% LPS
         horizon = par_omega(1);
         alfa = 1;
-        modelo = models.modelLPST(E,nu,par_omega,damage,G0);
-%         mm = weightedVolume(par_omega);
-%         kappa = E/3/(1-2*nu); mu = E/2/(1+nu);
-%         c(1) = kappa + mu/9*(nu+1)^2/(2*nu-1)^2;
-%         c(2) = 8*mu/mm;
-%         c(3) = nu;
-%         T = @models.forces.interactionForce_StateBased;
-%         model.linearity = false;
-%         model.stiffnessAnal = true;
-%         model.dilatation = true;
-        model.number = 4;
-        
+        modelo = models.modelLPST(E,nu,par_omega,damage,G0);        
         
         case "PMB"
         %% PMB
-        alfa = 1; % Because for the PMB we always have to modulate the influence function by 1/|\xi|
-        mm = weightedVolume(par_omega);        
-        horizon = par_omega(1);
-        c(1) = 6*E/mm;
-        T = @models.forces.interactionForce_PMB;
-        model.linearity = false;
-        model.stiffnessAnal = true;
-        model.dilatation = false;
-        model.number = 5;
-        
-        % -- Sc
-        if par_omega(2) == 3 && par_omega(3) == 1
-            damage.Sc = sqrt(5*pi*G0/9/(E)/horizon);
-        elseif par_omega(2) == 1 && par_omega(3) == 0
-            l = 4.3;
-            damage.Sc = sqrt((1+1/3)*pi*G0*l/(8*E*horizon*0.66467));
-        elseif par_omega(2) == 1 && par_omega(3) == 1
-            l = 3;
-            damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
-        else
-            warning('Critical bond not defined.')
-        end
-      
-        % Damage dependent Sc
-        if damage.DD
-            damage.alfa = 0.2; damage.beta = 0.2; damage.gamma = 1.4;
-        else
-            damage.alfa = 0; damage.beta = 0; damage.gamma = 1; % No dependency
-        end
+        modelo = models.modelPMB(E,par_omega,damage,G0);
         
         case "LSJ-T"
             modelo = models.modelLSJT(E,nu,par_omega,damage,G0,dt);

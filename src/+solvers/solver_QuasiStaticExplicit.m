@@ -422,14 +422,14 @@ function [xs] = sampling(x,t,ts)
     end
 end
 
-function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,dt,mu,T)
+function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,model,damage,history,dt,mu,T)
     % 0 - Correct mu
     if isempty(mu{1})
         mu(:) = {1};
     end
     % 1 - Define stiffness matrix
-    if model.stiffnessAnal
-        K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
+    if model.b_stiffnessAnal
+        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,model,damage,history,mu);
     else
         K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
     end

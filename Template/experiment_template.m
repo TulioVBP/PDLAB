@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.02; % [m]
+horizon = 0.04; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -24,11 +24,11 @@ b = 1; % length [m]
 
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
-damage.crackIn = [-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.crackIn = [];%[-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
-damage.damageOn = true; % True if applying damage to the model, false if not
+damage.damageOn = false; % True if applying damage to the model, false if not
 model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
 solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
@@ -41,7 +41,7 @@ sigmay = 6; % [MPa] Example
 stresses = [0 sigmay 0]*1e6; % [sigma_x, sigma_y, tau_xy] - Pa/m^2
 stress_app = '-'; %'-' means BC provided directly (use prescribedBC.m). 't', 'l', 'r' and 'b' represents top, left, right and bottom edges of retangular domain (tbr in next updates)
 pc = prescribedBC(x,stresses); % SET YOUR BCs IN THIS FUNCTION
-[ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,stresses,m,h,A,3,stress_app,pc);
+[ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,stresses,m,h,A,3,stress_app,pc,damage);
 
 % -------------- GENERATE FAMILY ------------------
 [family,partialAreas,maxNeigh,surfaceCorrection] = neighborhood.generateFamily_v2(x,A,horizon,m,1,false,PA_alg,SE_alg); % PA Algs: FA (choose for inhomogeneous mesh), PA-HHB and PA-AC. SE Algs: "None", "Volume"
@@ -54,7 +54,7 @@ modelo.history = values;  % Initialize his
 % -------------- SOLVER -------------------
 switch solver
     case "Dynamic/Explicit"
-        t_tot = 500e-6;% Final time
+        t_tot = 1000e-6;% Final time
         t = 0:dt:t_tot;
         n_tot = length(t);
         data_dump = 4; % Interval time steps to record outputs
