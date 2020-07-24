@@ -1,8 +1,8 @@
 classdef modelPMB
     properties
-        linearity = false;
-        stiffnessAnal = false;
-        dilatation = false;
+        b_linearity = false;
+        b_stiffnessAnal = true;
+        b_dilatation = false;
         number = 2;
         damage;
         c;
@@ -10,6 +10,7 @@ classdef modelPMB
     end
     % Methods
     methods
+        %% CONSTRUCTOR
         function obj = modelPMB(E,par_omega,damage,G0)
             %% Pre Initialization %%
              % Any code not using output argument (obj)
@@ -52,7 +53,7 @@ classdef modelPMB
             end
              
         end
-        
+        %% Force vector state
         function [f,history,mu] = T(obj,x,u,ii,jj,dof_vec,par_omega,separatorDamage,damage,history,noFail)
             %% INPUT
             % x - node position matrix
@@ -104,6 +105,7 @@ classdef modelPMB
 
         end
         
+        %% Strain energy density
         function W = strainEnergyDensity(obj,x,u,family,partialAreas,surfaceCorrection,ii,idb,par_omega,damage,historyS)
             familySet = family(family~=0);
             dofi = [idb(2*ii-1) idb(2*ii)];
@@ -122,6 +124,7 @@ classdef modelPMB
             W = sum(w.*partialAreas(neigh_ind)'.*surfaceCorrection(neigh_ind)');
         end
         
+        %% Update history
         function history = updateHistory(obj,S,history)
             if nargin < 2
                 error('No history was passed as argument.')
@@ -182,35 +185,60 @@ classdef modelPMB
                 obj.history.S = values;
             end
         end
+        
+        %% Stiffness matrix
+        function A = analyticalStiffnessMatrix(obj,x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,damage,history,mu)
+            C = obj.c(1)/2*weightedVolume(par_omega);
+            u = u';
+            penalty = 1e10;
+            N = size(x,1);
+            A = zeros(2*N,2*N); % 2N GDLs
+            m = weightedVolume(par_omega)*ones(length(x),1);
+            for ii = 1:N
+                dofi = [idb(2*ii-1) idb(2*ii)];
+                family = familySet(ii,familySet(ii,:)~=0);
+                iII = 1:length(family);
+                jj = family'; % j sum
+                dofj = [idb(2*jj-1) idb(2*jj)];
+                eta = u(dofj) - u(dofi);
+                xi = x(jj,:) - x(ii,:);
+                M = eta+xi;
+                normaj = vecnorm(xi')'; 
+                norma_eta = vecnorm(M')';
+                omegaj = influenceFunction(normaj,par_omega);
+                muj = mu{ii};
+                % U
+                if dofi(1) <= ndof
+                    % First dof of node ii is free
+                    ti1u = C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii); % Aii
+                    ti2u = C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii); % Aip
+                    tj1u = -C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);% Aij
+                    tj2u = -C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);% Aijp
+                    A(dofi(1),dofi(1)) = sum(ti1u);
+                    A(dofi(1),dofj(:,1)) = tj1u';
+                    A(dofi(1),dofi(2)) = sum(ti2u);
+                    A(dofi(1),dofj(:,2)) = tj2u';
+               else
+                    % Constraint nodes
+                    A(dofi(1),dofi(1)) = penalty;
+               end
+               if dofi(2) <= ndof
+                  % V
+                   ti1v = C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   ti2v = C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   tj1v = -C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   tj2v = -C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*muj.*V(ii);
+                   A(dofi(2),dofi(1)) = sum(ti1v);
+                   A(dofi(2),dofj(:,1)) = tj1v';
+                   A(dofi(2),dofi(2)) =sum(ti2v);
+                   A(dofi(2),dofj(:,2)) = tj2v';
+               else
+                    % Constraint nodes
+                    A(dofi(2),dofi(2)) = penalty;
+               end
+            end
+            A = -A;
+        end
    end
 end
 
-function p = antiderivativeDTT(obj,x,damage,noFail,ii)
-    % Modified PMB model
-    if damage.damageOn
-        % Damage dependent crack
-        alfa = obj.damage.alfa; beta = obj.damage.beta; gamma = obj.damage.gamma;
-        if damage.phi(ii) > alfa
-            Sc = obj.damage.Sc*min(gamma,1+beta*(damage.phi(ii)-alfa)/(1-damage.phi(ii)));
-        else
-            Sc = obj.damage.Sc;
-        end
-        S0 = [-0.98 0.95*Sc]; % S0- and S0+
-        S1 = [-0.99 1.05*Sc]; % S1- and S1+
-        % Evaluate integration constants
-        A = [1 0 0 0 0; 0 1 0 0 0; 1 0 0 -1 0; 0 0 1 0 0; 0 0 -1 0 1];
-        b = [S0(1)^2/2 - S0(1)/(S0(1) - S1(1))*(S0(1)^2/2 - S1(1)*S0(1));
-            0;
-            S0(1)/(S0(1) - S1(1))*(S1(1)^2/2);
-            S0(2)^2/2 - S0(2)/(S1(2) - S0(2))*(-S0(2)^2/2 + S1(2)*S0(2));
-            S0(2)/(S1(2) - S0(2))*S1(2)^2/2];
-        C = A\b;
-        p = (x<=S1(1)).* C(4) + (x<=S0(1)).*(x>S1(1)).*(S0(1)/(S0(1) - S1(1)).*(x.^2/2 - S1(1)*x) + C(1)) ...
-            + (x<=S0(2)).*(x>S0(1)).*(x.^2/2 + C(2)) + (x<=S1(2)).*(x>S0(2)).*(S0(2)/(S1(2) - S0(2)).*(S1(2)*x - x.^2/2) + C(3)) ...
-            + (x>S1(2)).*C(5);
-        % {Correcting the noFail}
-        p(noFail) = x(noFail).^2/2; 
-    else
-        p = x.^2/2;
-    end
-end

@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.04; % [m]
+horizon = 0.1; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -29,8 +29,8 @@ damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
 damage.damageOn = false; % True if applying damage to the model, false if not
-model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
-solver = "Dynamic/Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
+model.name = "LPS-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
+solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
 %% SIMULATION
@@ -94,7 +94,7 @@ switch solver
             load_par.t_max = 30;
         end
         [t_s,u_load,u_n,index_s,phi,energy,history,time_up,F_load,CC] = solvers.solver_QuasiStaticExplicit(x,idb,bodyForce,...
-                                                                       bc_set,family,A,partialAreas,surfaceCorrection,T,c,CC,model,par_omega,history,noFailZone,damage,b_parallelComp,beta,load_par,data_dump);
+                                                                       bc_set,family,A,partialAreas,surfaceCorrection,CC,modelo,par_omega,noFailZone,damage,b_parallelComp,beta,load_par,data_dump);
     otherwise
         error("Solver not yet implemented.")
         pause

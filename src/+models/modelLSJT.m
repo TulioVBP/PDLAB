@@ -1,8 +1,8 @@
 classdef modelLSJT
      properties
-        linearity = true;
-        stiffnessAnal = false;
-        dilatation = true;
+        b_linearity = true;
+        b_stiffnessAnal = false;
+        b_dilatation = true;
         damage;
         c;
         history;
@@ -49,7 +49,7 @@ classdef modelLSJT
             end
         end
         
-        function [theta,historyT] = dilatationEval(obj,x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,damage,historyS,historyT)
+        function [theta,historyT] = dilatation(obj,x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,damage,historyS,historyT)
             if isempty(transvList) % Not a specific range of nodes was chosen
                transvList = 1:length(x);
             end
@@ -70,15 +70,19 @@ classdef modelLSJT
                 S_linear = dot(xi',eta')'./norma.^2;
                 theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                 % DAMAGE
-                Sc = obj.damage_dependent(damage.phi(ii));
-                history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
-                XX = {history_upS, historyT(ii), historyT(jj)}; 
-                noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-                [H,~,~] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
+                if nargin > 8
+                    Sc = obj.damage_dependent(damage.phi(ii));
+                    history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
+                    XX = {history_upS, historyT(ii), historyT(jj)}; 
+                    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+                    [H,~,~] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
+                else
+                    H = 1;
+                end
                 theta(transv_ind) = sum(theta_vec.*H); % Tulio's model
                 transv_ind = transv_ind + 1;
             end
-            historyT = obj.updateHistoryT(theta(transvList),historyT);
+            historyT(transvList) = obj.updateHistoryT(theta,historyT(transvList));
         end
         
         function [f,historyS,mu] = T(obj,x,u,theta,ii,jj,dof_vec,par_omega,separatorDamage,damage,historyS,historyTheta,noFail)

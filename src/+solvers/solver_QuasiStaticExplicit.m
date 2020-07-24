@@ -1,5 +1,5 @@
 function [t_s,u_load,un_sample,index_s,phi_sample,energy,history,time_up,F_load,CC] = solver_QuasiStaticExplicit(x,idb,body_force,...
-   bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,damping,model,par_omega,history,noFailZone,damage,b_parll,beta,load_par,data_dump)
+   bc_set,familyMat,A,partialAreas,surfaceCorrection,damping,model,par_omega,noFailZone,damage,b_parll,beta,load_par,data_dump)
 % Unravel load parameters
 n_load = load_par.n_load;
 n_iterMax = load_par.n_iterMax;
@@ -26,8 +26,8 @@ n_iterMax = load_par.n_iterMax;
     
     %% Defining cracking trespassing matrix
     crackSegments = size(damage.crackIn,1); % At least 2
-    damage.checkCrack = zeros(size(history.S));
-    for ii = 1:size(history.S)
+    damage.checkCrack = zeros(size(model.history.S));
+    for ii = 1:size(model.history.S)
         x_j = x(familyMat(ii,familyMat(ii,:)~=0),:);
         check = zeros(size(x_j,1),crackSegments-1);
         for kk = 1:crackSegments-1
@@ -52,6 +52,10 @@ n_iterMax = load_par.n_iterMax;
     u_load = zeros(2*length(x),n_load); % Displacement for load steps
     mu = cell(length(x),n_load); % Damage factor initialization
     damage.phi = zeros(length(x),1); % Initializing phi in the damage structure
+    history.S = model.history.S; %
+    if model.b_dilatation
+        history.theta = model.history.theta;
+    end
     
     % Initialize time vectors and density according to this
     if load_par.b_tgiven
@@ -59,7 +63,7 @@ n_iterMax = load_par.n_iterMax;
         dt = abs(t(2)-t(1));
         % Density
         u0 = zeros(2*length(x),1);
-        lambda = evaluateLambda(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,dt,mu(:,1),T);
+        lambda = evaluateLambda(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,A,par_omega,model,damage,history,dt,mu(:,1));
         lambda_inv = 1./lambda;
         figure
         histogram(lambda)
@@ -79,7 +83,7 @@ n_iterMax = load_par.n_iterMax;
         
         % Time vector
         u0 = zeros(2*length(x),1);
-        dt = evaluateDeltaT(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,ones(2*length(x)),par_omega,c,model,damage,history,lambda,mu(:,1),T);
+        dt = evaluateDeltaT(x,u0,ndof,idb,familyMat,partialAreas,surfaceCorrection,A,par_omega,model,damage,history,lambda,mu(:,1));
         t = 0:dt:load_par.t_max;
     end
     t_full = t(1):dt:t(end)*n_load;
@@ -128,7 +132,7 @@ n_iterMax = load_par.n_iterMax;
     
     % Temporary variables
     history_tempS = history.S;
-    if model.dilatation 
+    if model.b_dilatation 
         history_tempT = history.theta;
     end
     fn_temp = zeros(size(x));
@@ -194,13 +198,13 @@ n_iterMax = load_par.n_iterMax;
             % ---- {Evaluating dilatation} ----
            
             damage.phi = phi(:,n); % Accessing current damage situation
-            if model.dilatation
+            if model.b_dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_tempT(ii)] = dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history,dt);
+                        [theta(ii),history_tempT(ii)] = model.dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S, history.theta);
                     end
                 else
-                    [theta,history_tempT] = dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,dt);
+                    [theta,history_tempT] = model.dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history.S,history.theta);
                 end
                 history.theta = history_tempT; % Assigning up-to-date history variable
             end
@@ -216,11 +220,11 @@ n_iterMax = load_par.n_iterMax;
 
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
 
                 end
             end
@@ -252,7 +256,7 @@ n_iterMax = load_par.n_iterMax;
                 un_sample(:,index_s) = u_n(:,2);
                 
                 % {Force load} - EDIT HERE TO OBTAIN FORCES CROSSING A GIVEN TRANSVERSAL SECTION 
-                F_load(index_s,:) = forceDisplacement(x,u_n(:,2),familyMat,dof_vec,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta,A);
+                F_load(index_s,:) = forceDisplacement(x,u_n(:,2),familyMat,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,A);
                 
                 % {Phi}
                 phi_sample(:,index_s) = phi_temp;
@@ -379,7 +383,7 @@ n_iterMax = load_par.n_iterMax;
 end
 
 %%
-function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,A,theta,b_sampling)
+function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling)
    % Loop on the nodes
    family = familyMat(ii,familyMat(ii,:)~=0);
    history_upS = history.S(ii,:);
@@ -389,10 +393,10 @@ function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,id
    % Loop on their neighbourhood
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
    Vj = partialAreas(ii,neig_index)'; 
-   if model.dilatation
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),history.theta,noFail);
+   if model.b_dilatation
+      [fij,history_upS(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),history.theta,noFail);
    else
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),noFail);
+      [fij,history_upS(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),noFail);
    end
    lambda = surfaceCorrection(ii,neig_index)';
    f_i = sum(fij.*Vj.*lambda);
@@ -401,11 +405,11 @@ function [f_i,history_upS,mu_j,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,id
    partialDamage = sum(mu_j.*Vj);
    phi_up = 1 - partialDamage/areaTot;
    if b_sampling
-       if ~model.dilatation
+       if ~model.b_dilatation
            % Strain energy
-           W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
+           W = model.strainEnergyDensity(x,u_n,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_upS(1,neig_index));
        else
-           W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
+           W = model.strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
        end
        % Stored strain energy
        energy_pot = W.*A(ii);
@@ -422,16 +426,16 @@ function [xs] = sampling(x,t,ts)
     end
 end
 
-function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,model,damage,history,dt,mu,T)
+function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,model,damage,history,dt,mu)
     % 0 - Correct mu
     if isempty(mu{1})
         mu(:) = {1};
     end
     % 1 - Define stiffness matrix
     if model.b_stiffnessAnal
-        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,model,damage,history,mu);
+        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(size(V)),par_omega,damage,history,mu);
     else
-        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,ones(size(V)),surfaceCorrection,ndof,par_omega,model,damage,history);
     end
     % 2 - Define lambda
     lambda = diag(eye(ndof));
@@ -441,16 +445,16 @@ function lambda = evaluateLambda(x,u,ndof,idb,family,partialAreas,surfaceCorrect
     lambda(lambda < 1e-13) = max(lambda(lambda > 1e-13));
 end
 
-function dt = evaluateDeltaT(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history,lambda,mu,T)
+function dt = evaluateDeltaT(x,u,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,model,damage,history,lambda,mu)
     % 0 - Correct mu
     if isempty(mu{1})
         mu(:) = {1};
     end
     % 1 - Define stiffness matrix
-    if model.stiffnessAnal
-        K = analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(length(x),1),par_omega,c,model,damage,history,mu);
+    if model.b_stiffnessAnal
+        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(V),par_omega,model,damage,history,mu);
     else
-        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,ones(V),surfaceCorrection,ndof,par_omega,model,damage,history);
     end
     % 2 - Define lambda
     dt_vec = diag(eye(ndof));
@@ -461,7 +465,6 @@ function dt = evaluateDeltaT(x,u,ndof,idb,family,partialAreas,surfaceCorrection,
     figure
     histogram(dt_vec,30);
 end
-
 
 function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     % 4 - Define K diagonal
@@ -480,7 +483,7 @@ function [C,count] = evaluateDamping(lambda,u,ndof,dt,F,v,count)
     end
 end
 
-function F = forceDisplacement(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta,V)
+function F = forceDisplacement(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,V)
    x_bound = 0.020; 
    F = [0 0];
    for ii = 1:length(x)
@@ -493,22 +496,22 @@ function F = forceDisplacement(x,u,family,dof_vec,partialAreas,surfaceCorrection
               neig_index = neig_index(x(family_ii_comp,2) > x_bound);
               
               if ~isempty(family_ii)
-                f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,c,model,damage,dt,history,T,theta);
+                f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
                 F = F + f_i*V(ii);
               end
        end
    end
 end
 
-function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,surfaceCorrection,par_omega,c,model,damage,dt,history,T,theta)
+function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta)
    jj = family();
    % Loop on their neighbourhood
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
    Vj = partialAreas';
-   if model.dilatation
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),history.theta,noFail);
+   if model.b_dilatation
+      [fij,~,~] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),history.theta,noFail);
    else
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,Vj,damage,dt,history.S(ii,neig_index),noFail);
+      [fij,~,~] = model.T(x,u_n,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),noFail);
    end
    lambda = surfaceCorrection';
    

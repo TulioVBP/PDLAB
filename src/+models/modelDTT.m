@@ -1,8 +1,8 @@
 classdef modelDTT
     properties
-        linearity = false;
-        stiffnessAnal = false;
-        dilatation = false;
+        b_linearity = false;
+        b_stiffnessAnal = false;
+        b_dilatation = false;
         number = 1;
         damage;
         c;

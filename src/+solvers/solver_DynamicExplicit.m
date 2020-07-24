@@ -87,7 +87,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
         % Temporary variables
         history_S = model.history.S; %
-        if model.dilatation 
+        if model.b_dilatation 
              history_T = model.history.theta;
         else
              history_T = [];
@@ -129,13 +129,13 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             % ---- {Evaluating dilatation} ----
             theta = zeros(length(x),1); % Preallocate theta
             damage.phi = phi(:,n); % Accessing current damage situation
-            if model.dilatation
+            if model.b_dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_T(ii)] = model.dilatationEval(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history_T(ii));
+                        [theta(ii),history_T(ii)] = model.dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history_T(ii));
                     end
                 else
-                    [theta,history_T] = model.dilatationEval(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history_S,history_T);
+                    [theta,history_T] = model.dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history_S,history_T);
                 end
                 %model.history.theta = history_tempT; % Assigning up-to-date history variable
             end
@@ -265,7 +265,7 @@ function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii
    % Loop on their neighbourhood
    history_S_up = history_S; 
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-   if model.dilatation
+   if model.b_dilatation
       [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),history_T,noFail);
    else
       [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),noFail);
@@ -278,7 +278,7 @@ function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii
    partialDamage = sum(mu_j.*Vj);
    phi_up = 1 - partialDamage/areaTot;
    if b_Weval
-       if ~model.dilatation
+       if ~model.b_dilatation
            % Strain energy
            W = model.strainEnergyDensity(x,u_n,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index));
        else
