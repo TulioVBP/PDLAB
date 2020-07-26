@@ -28,8 +28,9 @@ damage.crackIn = [];%[-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of th
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
-damage.damageOn = false; % True if applying damage to the model, false if not
-model.name = "LPS-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
+
+damage.damageOn = true; % True if applying damage to the model, false if not
+model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
 solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
