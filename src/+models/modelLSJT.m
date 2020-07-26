@@ -138,7 +138,7 @@ classdef modelLSJT
             % Tensile term Lt
             ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,obj.c,damage.damageOn,Sc).*ee;
             % Dilatation term Ld
-            fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*(Hd_y.*gscalar(theta_j,obj.c,damage.damageOn,obj.damage.thetaC_p) + Hd_x.*gscalar(theta_i,obj.c,damage.damageOn,obj.damage.thetaC_p)).*ee;
+            fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*Ht.*(Hd_y.*gscalar(theta_j,obj.c,damage.damageOn,obj.damage.thetaC_p) + Hd_x.*gscalar(theta_i,obj.c,damage.damageOn,obj.damage.thetaC_p)).*ee;
             % Final force
             f = fd + ft;
             mu = Ht; % Check for damage in this model
@@ -178,7 +178,7 @@ classdef modelLSJT
             % HT
             HT = ones(length(x{1}),1);
             if damage.damageOn
-                xc = (0.05)^2/(1+1.05^2) * 0.02e-6; % js(Sc)*dt = 2.3781e-11
+                xc = (0.05)^2/(1+1.05^2) * obj.dt; % js(Sc)*dt = 2.3781e-11
                 HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
                 HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
             end

@@ -233,6 +233,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         % Sampling the results
         [u_n] = sampling(u_n,t,t_s);
         [phi] = sampling(phi,t,t_s);
+        history.S = history_S;
 end
 %%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)

@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.1; % [m]
+horizon = 0.2; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -15,7 +15,7 @@ omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - c
 par_omega = [horizon omega gamma];
 PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
-dt = 0.5e-6; % Time step
+dt = 1;%0.5e-6; % Time step
 
 % --- Mesh -----------------
 a = 0.15; % height [m]
@@ -24,11 +24,10 @@ b = 1; % length [m]
 
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
-damage.crackIn = [];%[-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.crackIn = [-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
-
 damage.damageOn = true; % True if applying damage to the model, false if not
 model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
 solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"

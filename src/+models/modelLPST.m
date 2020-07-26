@@ -81,7 +81,7 @@ classdef modelLPST
             end
         end
         
-        function [f,historyS,mu] = T(obj,x,u,theta,ii,jj,dof_vec,par_omega,separatorDamage,damage,historyS,historyTheta,noFail,dt)
+        function [f,historyS,mu] = T(obj,x,u,theta,ii,jj,dof_vec,par_omega,separatorDamage,damage,historyS,historyTheta,noFail)
             nu = obj.c(3);
             dofi = dof_vec(ii,:); 
             dofj = dof_vec(jj,:);

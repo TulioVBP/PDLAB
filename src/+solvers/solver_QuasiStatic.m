@@ -1,6 +1,6 @@
-%QUASI-STATIC SOLVER
+% QUASI-STATIC SOLVER
 
-function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,surfaceCorrection,T,c,model,par_omega,ndof,V,damage,history,noFailZone)
+function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,surfaceCorrection,model,par_omega,ndof,V,damage,history,noFailZone)
 N = length(idb);
 if length(V) == 1
    V = V*ones(length(x),1); 
@@ -68,7 +68,7 @@ for n = 1:n_tot
     %          for the load step.
     epsilon = 10^-4;
     damage.phi = phi(:,n); % Accessing current damage situation
-    [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+    [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,model,damage,history); % Update to include arbitrary displacement kinematic conditions
     r_max = epsilon*max(norm(bn(1:ndof).*V_DOF(1:ndof),Inf),norm(f_int(1:ndof,n).*V_DOF(1:ndof),Inf)); % Normalizing the maximum residual
     if r_max == 0 % No forces on the non-constrain nodes
         r_max = 10^-4;
@@ -83,16 +83,16 @@ for n = 1:n_tot
         while r > r_max
             % {Damage}
             damage.phi = phi(:,n); % Accessing current damage situation
-            if ~model.stiffnessAnal 
-                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+            if ~model.b_stiffnessAnal 
+                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,ndof,par_omega,model,damage,history);
             else
-                K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
+                K = model.analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,damage,history);
             end
             disp('Stiffness matrix done.')
             du = -K\r_vec;
             disp('Incremental solution found.')
             u_trial = u_trial + alpha*du;
-            [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+            [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,model,damage,history); % Update to include arbitrary displacement kinematic conditions
             r = norm(r_vec(1:ndof),Inf);
             %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
             disp("Iter:" + int2str(iter) + " Residual equal to "+ num2str(r) + ". Maximum residual to be " + num2str(r_max))
@@ -109,10 +109,10 @@ for n = 1:n_tot
         % {Damage}
         damage.phi = phi(:,n); % Accessing current damage situation
         if n < 2 % If the model is linear, there is no need to find the matrix more than once
-            if ~model.stiffnessAnal 
-                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,T,ndof,par_omega,c,model,damage,history);
+            if ~model.b_stiffnessAnal 
+                K = tangentStiffnessMatrix(x,u_trial,idb,family,partialAreas,V,surfaceCorrection,ndof,par_omega,model,damage,history);
             else
-                K = analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,c,model,damage,history);
+                K = model.analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,damage,history);
             end
         end
         disp('Stiffness matrix done.')
@@ -124,12 +124,12 @@ for n = 1:n_tot
         du = -K\(ff);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
         un(:,n) = u_trial + du;
-        [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,un(:,n),T,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,c,model,damage,history); % Update to include arbitrary displacement kinematic conditions
+        [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,un(:,n),bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,model,damage,history); % Update to include arbitrary displacement kinematic conditions
         r = norm(r_vec(1:ndof),Inf);
     end
     % Energy
-    if model.dilatation
-        [theta,history.theta] = dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,0); 
+    if model.b_dilatation
+        [theta,history.theta] = model.dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,model,damage,history.S,history.theta); 
     end
     if ~isempty(bc_set)
        con_dof = idb(bc_set(:,1));
@@ -138,10 +138,10 @@ for n = 1:n_tot
     end
     for ii=1:length(x)
        dofi = dof_vec(ii,:);
-       if model.dilatation
-        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:),history.theta)*V(ii);
+       if model.b_dilatation
+        energy.W(ii,n) = model.strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S(ii,:),history.theta)*V(ii);
        else 
-        energy.W(ii,n) = strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history.S(ii,:))*V(ii);
+        energy.W(ii,n) = model.strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S(ii,:))*V(ii);
        end
        if n>1
            bn_1 = b*((n-1)/n_tot); % b_(n-1)
@@ -171,12 +171,12 @@ end
 
 end
 
-function [f,history,phi,f_model] = getForce(x,u,T,b,familyMat,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,c,model,damage,history)
+function [f,history,phi,f_model] = getForce(x,u,b,familyMat,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V,par_omega,model,damage,history)
 N = length(x);
 f = zeros(size(u));
 % Evaluate dilatation
-if model.dilatation
-    [theta,history.theta] = dilatation(x,u,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,0);
+if model.b_dilatation
+    [theta,history.theta] = model.dilatation(x,u,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history.S,history.theta);
 end
 % {Evaluate the force, history variables and damage}
 phi = zeros(length(x),1);
@@ -187,9 +187,9 @@ for ii = 1:N
     jj = family;
     noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
         if model.dilatation
-            [fij,history.S(ii,neig_index),mu_j] = T(x,u,theta,ii,jj,dof_vec,par_omega,c,model,[],damage,0,history.S(ii,neig_index),history.theta,noFail);
+            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,theta,ii,jj,dof_vec,par_omega,[],damage,0,history.S(ii,neig_index),history.theta,noFail);
         else
-            [fij,history.S(ii,neig_index),mu_j] = T(x,u,ii,jj,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neig_index),noFail);
+            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,ii,jj,dof_vec,par_omega,[],damage,[],history.S(ii,neig_index),noFail);
         end
         Vj = partialAreas(ii,neig_index)';
         lambda = surfaceCorrection(ii,neig_index)';
