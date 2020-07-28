@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.2; % [m]
+horizon = 0.05; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -24,13 +24,13 @@ b = 1; % length [m]
 
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
-damage.crackIn = [-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.crackIn = [];%[-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
-damage.damageOn = true; % True if applying damage to the model, false if not
+damage.damageOn = false; % True if applying damage to the model, false if not
 model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
-solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
+solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
 %% SIMULATION
@@ -72,7 +72,7 @@ switch solver
             error('Disable damage to run a quasi-static solver')
         end
         n_tot = 4; % Number of load steps
-        [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,T,c,model,par_omega,ndof,A,damage,history,noFailZone);
+        [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,modelo,par_omega,ndof,A,damage,noFailZone);
         out.x = x; out.un = u_n; out.energy = energy;
     case "Quasi-Static Explicit"
         load_par.n_iterMax = 50;

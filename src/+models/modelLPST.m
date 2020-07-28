@@ -1,6 +1,6 @@
 classdef modelLPST
      properties
-        linearity = false;
+        b_linearity = false;
         b_stiffnessAnal = true;
         b_dilatation = true;
         number = 1;
@@ -151,9 +151,11 @@ classdef modelLPST
                 mu = (x<= S0(2)).*(x>=-1).*1 + (x > S0(2)).*(x<S1(2)).*(S1(2) - x)/(S1(2) - S0(2));
             end
             % Deal with initial broken bonds
-            brokenBonds = damage.brokenBonds(ii,neighIndex);
-            if any(brokenBonds)
-                mu(brokenBonds,:) = zeros(sum(brokenBonds),size(mu,2));
+            if isfield(damage,'brokenBonds')
+                brokenBonds = damage.brokenBonds(ii,neighIndex);
+                if any(brokenBonds)
+                    mu(brokenBonds,:) = zeros(sum(brokenBonds),size(mu,2));
+                end
             end
             if ~isempty(noFail)
                 mu(noFail,:) = ones(size(mu(noFail,:)));
@@ -220,7 +222,12 @@ classdef modelLPST
                 normaj = vecnorm(xi,2,2); 
                 norma_eta = vecnorm(M,2,2);
                 omegaj = influenceFunction(normaj,par_omega);
+                
+                muj = 1;
+                if nargin > 12 % if mu is provided
                 muj = mu{ii};
+                end
+                
                 PSI_ij = M./norma_eta;
                 % Parameters
                 Vij = partialAreas(ii,iII)';
@@ -248,7 +255,11 @@ classdef modelLPST
                         
                         norma_etak = vecnorm(M_k,2,2);
                         omegak = influenceFunction(normak,par_omega);
+                        
+                        muk = 1;
+                        if nargin > 12
                         muk = mu{j};
+                        end
                         PSI_jk = M_k./norma_etak;
                         Vjk = partialAreas(j,iIII)';
                         % Parameters
@@ -276,7 +287,7 @@ classdef modelLPST
                         A(dofi(1),dofj(:,2)) = A(dofi(1),dofj(:,2)) + tj2(:,1)'* V(ii);
                     else
                         % Constraint nodes
-                        A(dofi(1),dofi(1)) = -penalty;
+                        A(dofi(1),dofi(1)) = penalty;
                     end
                    % V
                    if dofi(2) <= ndof
@@ -286,11 +297,11 @@ classdef modelLPST
                         A(dofi(2),dofj(:,2)) = A(dofi(2),dofj(:,2)) + tj2(:,2)' * V(ii);
                    else
                         % Constraint nodes
-                        A(dofi(2),dofi(2)) = -penalty;
+                        A(dofi(2),dofi(2)) = penalty;
                    end
                 else
-                    A(dofi(1),dofi(1)) = -penalty;
-                    A(dofi(2),dofi(2)) = -penalty;
+                    A(dofi(1),dofi(1)) = penalty;
+                    A(dofi(2),dofi(2)) = penalty;
                 end
             end
         end

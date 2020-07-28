@@ -1,6 +1,6 @@
 % QUASI-STATIC SOLVER
 
-function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,surfaceCorrection,model,par_omega,ndof,V,damage,history,noFailZone)
+function [un,r,energy,phi] = solver_QuasiStatic(x,n_tot,idb,b,bc_set,family,partialAreas,surfaceCorrection,model,par_omega,ndof,V,damage,noFailZone)
 N = length(idb);
 if length(V) == 1
    V = V*ones(length(x),1); 
@@ -15,8 +15,8 @@ penalty = 1e10;
 %{Defining cracking trespassing matrix}
     %if damage.damageOn
         crackSegments = size(damage.crackIn,1); % At least 2
-        damage.checkCrack = zeros(size(history.S));
-        for ii = 1:size(history.S)
+        damage.checkCrack = zeros(size(model.history.S));
+        for ii = 1:size(model.history.S)
             x_j = x(family(ii,family(ii,:)~=0),:);
             check = zeros(size(x_j,1),crackSegments-1);
             for kk = 1:crackSegments-1
@@ -47,6 +47,10 @@ energy.W = zeros(length(x),n_tot);
 energy.KE = zeros(length(x),n_tot);
 energy.EW = zeros(length(x),n_tot);
 f_int = zeros(N,n_tot);
+history.S = model.history.S;
+if model.b_dilatation
+    history.theta = model.history.theta;
+end
 % Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
@@ -62,7 +66,7 @@ for n = 1:n_tot
     %% Step 2.5 - Assign an initial guess to the trial displacement utrial (for example, utrial = un).
     u_trial = un(:,n);
     if ~isempty(bc_set)
-        u_trial(ndof+1:end) = bc_setn(:,2);
+        u_trial(ndof+1:end) = bc_setn(:,2); % minus is because it is on the right hand side
     end
     %% Step 3 - Evaluate the residual vector, r, and residual r. Determine the convergence criterion
     %          for the load step.
@@ -77,7 +81,7 @@ for n = 1:n_tot
     r = norm(r_vec(1:ndof),Inf);
     alpha = 1;
     % -------------------- Newton's method ----------------
-    if ~model.linearity
+    if ~model.b_linearity
         % Suitable for non-linear models
         iter = 1;
         while r > r_max
@@ -119,7 +123,7 @@ for n = 1:n_tot
         %bn = bn*V;
         ff = bn.*V_DOF;
         if ~isempty(bc_set)
-            ff(ndof+1:end) = penalty*bc_set(:,2)*(n/n_tot);
+            ff(ndof+1:end) = -penalty*bc_set(:,2)*(n/n_tot);
         end
         du = -K\(ff);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
@@ -129,7 +133,7 @@ for n = 1:n_tot
     end
     % Energy
     if model.b_dilatation
-        [theta,history.theta] = model.dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,model,damage,history.S,history.theta); 
+        [theta,history.theta] = model.dilatation(x,un(:,n),family,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history.S,history.theta); 
     end
     if ~isempty(bc_set)
        con_dof = idb(bc_set(:,1));
@@ -141,7 +145,7 @@ for n = 1:n_tot
        if model.b_dilatation
         energy.W(ii,n) = model.strainEnergyDensity(x,un(:,n),theta,family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S(ii,:),history.theta)*V(ii);
        else 
-        energy.W(ii,n) = model.strainEnergyDensity(x,un(:,n),[],family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S(ii,:))*V(ii);
+        energy.W(ii,n) = model.strainEnergyDensity(x,un(:,n),family(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.S(ii,:))*V(ii);
        end
        if n>1
            bn_1 = b*((n-1)/n_tot); % b_(n-1)
@@ -186,10 +190,10 @@ for ii = 1:N
     neig_index = 1:length(family);
     jj = family;
     noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-        if model.dilatation
-            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,theta,ii,jj,dof_vec,par_omega,[],damage,0,history.S(ii,neig_index),history.theta,noFail);
+        if model.b_dilatation
+            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,theta,ii,jj,dof_vec,par_omega,[],damage,history.S(ii,neig_index),history.theta,noFail);
         else
-            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,ii,jj,dof_vec,par_omega,[],damage,[],history.S(ii,neig_index),noFail);
+            [fij,history.S(ii,neig_index),mu_j] = model.T(x,u,ii,jj,dof_vec,par_omega,[],damage,history.S(ii,neig_index),noFail);
         end
         Vj = partialAreas(ii,neig_index)';
         lambda = surfaceCorrection(ii,neig_index)';
@@ -205,7 +209,7 @@ f = (f + b).*V; % 2N
 % Change it to add boundary conditions
 penalty = 1e10;
 if ~isempty(bc_set)
-    f(ndof+1:end) = penalty*zeros(size(bc_set(:,2))); % The second collumn of bc_set represents the value of the constrain
+    f(ndof+1:end) = - penalty*zeros(size(bc_set(:,2))); % The second collumn of bc_set represents the value of the constrain; minus for the relation u = -K\f;
 end
 end
 

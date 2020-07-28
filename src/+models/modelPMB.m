@@ -194,6 +194,7 @@ classdef modelPMB
             N = size(x,1);
             A = zeros(2*N,2*N); % 2N GDLs
             m = weightedVolume(par_omega)*ones(length(x),1);
+           
             for ii = 1:N
                 dofi = [idb(2*ii-1) idb(2*ii)];
                 family = familySet(ii,familySet(ii,:)~=0);
@@ -206,7 +207,10 @@ classdef modelPMB
                 normaj = vecnorm(xi')'; 
                 norma_eta = vecnorm(M')';
                 omegaj = influenceFunction(normaj,par_omega);
-                muj = mu{ii};
+                muj = 1;
+                if nargin > 12 % damage factor provided
+                    muj = mu{ii};
+                end               
                 % U
                 if dofi(1) <= ndof
                     % First dof of node ii is free
@@ -234,7 +238,7 @@ classdef modelPMB
                    A(dofi(2),dofj(:,2)) = tj2v';
                else
                     % Constraint nodes
-                    A(dofi(2),dofi(2)) = penalty;
+                    A(dofi(2),dofi(2)) = -penalty;
                end
             end
             A = -A;

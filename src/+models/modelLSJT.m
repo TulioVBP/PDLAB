@@ -1,7 +1,7 @@
 classdef modelLSJT
      properties
         b_linearity = true;
-        b_stiffnessAnal = false;
+        b_stiffnessAnal = true;
         b_dilatation = true;
         damage;
         c;
@@ -71,7 +71,11 @@ classdef modelLSJT
                 theta_vec = 1/V_delta*influenceFunction(norma,par_omega).*norma.^2.*S_linear.*partialAreas(transv_ind,neigh_ind)'.*surfaceCorrection(transv_ind,neigh_ind)';
                 % DAMAGE
                 if nargin > 8
-                    Sc = obj.damage_dependent(damage.phi(ii));
+                    if damage.damageOn
+                        Sc = obj.damage_dependent(damage.phi(ii));
+                    else
+                        Sc = obj.damage.Sc;
+                    end
                     history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
                     XX = {history_upS, historyT(ii), historyT(jj)}; 
                     noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
@@ -121,7 +125,11 @@ classdef modelLSJT
             ee = (xi)./norma; % Versor
             
             % . Evaluating js
-            Sc = obj.damage_dependent(damage.phi(ii));
+            if damage.damageOn
+                Sc = obj.damage_dependent(damage.phi(ii));
+            else
+                Sc = obj.damage.Sc;
+            end
             historyS = obj.updateHistory(S,historyS',Sc); % NX1
             XX = {historyS, historyTheta(ii), historyTheta(jj)}; 
             [Ht,Hd_x,Hd_y] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
@@ -142,9 +150,6 @@ classdef modelLSJT
             % Final force
             f = fd + ft;
             mu = Ht; % Check for damage in this model
-            if any(damage.brokenBonds(ii,1:length(jj)))
-                f(damage.brokenBonds(ii,1:length(jj)),:) = zeros(sum(damage.brokenBonds(ii,1:length(jj))),2); % Guaranteeing initial damage
-            end
         end
         
         function [historyS] = updateHistory(obj,S,historyS,Sc)
@@ -186,9 +191,11 @@ classdef modelLSJT
             HDi = 1;
             HDj = ones(length(x{3}),1);
             % Deal with initial broken bonds
-            brokenBonds = damage.brokenBonds(ii,neighIndex);
-            if any(brokenBonds)
-                HT(brokenBonds,:) = zeros(sum(brokenBonds),size(HT,2));
+            if isfield(damage,'brokenBonds')
+                brokenBonds = damage.brokenBonds(ii,neighIndex);
+                if any(brokenBonds)
+                    HT(brokenBonds,:) = zeros(sum(brokenBonds),size(mu,2));
+                end
             end
             if ~isempty(noFail)
                 HT(noFail,:) = ones(size(HT(noFail,:)));
@@ -239,6 +246,110 @@ classdef modelLSJT
                 Sc = obj.damage.Sc*min(gamma,1+beta*(phi-alfa)/(1-phi));
             else
                 Sc = obj.damage.Sc;
+            end
+        end
+        
+        function A = analyticalStiffnessMatrix(obj,x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,damage,history,mu)
+            u = u';
+            horizon = par_omega(1);
+            V_delta  = pi*horizon^2;
+            AA = 1/V_delta;
+            penalty = 1e10;
+            N = size(x,1);
+            A = zeros(2*N,2*N); % 2N GDLs
+            m = weightedVolume(par_omega)*ones(length(x),1);
+            for ii = 1:N
+                dofi = [idb(2*ii-1) idb(2*ii)];
+                family = familySet(ii,familySet(ii,:)~=0);
+                Nj = length(family);
+                iII = 1:Nj;
+                jj = family'; % j sum
+                dofj = [idb(2*jj-1) idb(2*jj)];
+                eta = u(dofj) - u(dofi);
+                xi = x(jj,:) - x(ii,:);
+                normaj = vecnorm(xi,2,2); 
+                omegaj = influenceFunction(normaj,par_omega);
+                
+                muj = 1;
+                if nargin > 12 % if mu is provided
+                muj = mu{ii};
+                end
+                
+                PSI_ij = xi./normaj;
+                % Parameters
+                Vij = partialAreas(ii,iII)';
+                c1 = 1/V_delta * omegaj .* 1/horizon .* obj.c(1);
+                c2 = 1/V_delta * omegaj.*normaj * 1/horizon * obj.c(2);
+                g = omegaj.*normaj;
+                % U and V
+                if dofi(1) <= ndof || dofi(2) <= ndof
+                    % First dof of node ii is free
+  
+                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aii
+                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aip
+                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aij
+                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aijp
+                    
+                    for Ij = 1:length(jj)
+                        j = jj(Ij);
+                        kk  = familySet(j,familySet(j,:)~=0)';
+                        iIII = 1:length(kk);
+                        dofk = [idb(2*kk-1) idb(2*kk)];
+                        eta_k = u(dofk) - u(dofj(Ij,:));
+                        xi_k = x(kk,:) - x(j,:);
+                        M_k = eta_k+xi_k;
+                        normak = vecnorm(xi_k,2,2); 
+                        
+                        norma_etak = vecnorm(M_k,2,2);
+                        omegak = influenceFunction(normak,par_omega);
+                        
+                        muk = 1;
+                        if nargin > 12
+                        muk = mu{j};
+                        end
+                        PSI_jk = M_k./norma_etak;
+                        Vjk = partialAreas(j,iIII)';
+                        % Parameters
+                        gk = omegak.*normak;
+                        
+                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:); 
+                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:);
+                        tk1 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        tk2 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        
+                        if dofi(1) <= ndof
+                            A(dofi(1),dofk(:,1)) = A(dofi(1),dofk(:,1)) + tk1(:,1)' * V(ii);
+                            A(dofi(1),dofk(:,2)) = A(dofi(1),dofk(:,2)) + tk2(:,1)' * V(ii);
+                        end
+                        if dofi(2) <= ndof
+                            A(dofi(2),dofk(:,1)) = A(dofi(2),dofk(:,1)) + tk1(:,2)' * V(ii);
+                            A(dofi(2),dofk(:,2)) = A(dofi(2),dofk(:,2)) + tk2(:,2)' * V(ii);
+                        end 
+                    end
+                    % U
+                    if dofi(1) <= ndof
+                        A(dofi(1),dofi(1)) = A(dofi(1),dofi(1)) + ti1(1) *V(ii) ;
+                        A(dofi(1),dofj(:,1)) = A(dofi(1),dofj(:,1)) + tj1(:,1)' * V(ii);
+                        A(dofi(1),dofi(2)) = A(dofi(1),dofi(2)) + ti2(1) * V(ii);
+                        A(dofi(1),dofj(:,2)) = A(dofi(1),dofj(:,2)) + tj2(:,1)'* V(ii);
+                    else
+                        % Constraint nodes
+                        A(dofi(1),dofi(1)) = penalty;
+                    end
+                   % V
+                   if dofi(2) <= ndof
+                        A(dofi(2),dofi(1)) = A(dofi(2),dofi(1)) + ti1(2) *V(ii) ;
+                        A(dofi(2),dofj(:,1)) = A(dofi(2),dofj(:,1)) + tj1(:,2)' * V(ii);
+                        A(dofi(2),dofi(2)) = A(dofi(2),dofi(2)) + ti2(2) * V(ii);
+                        A(dofi(2),dofj(:,2)) = A(dofi(2),dofj(:,2)) + tj2(:,2)' * V(ii);
+                   else
+                        % Constraint nodes
+                        A(dofi(2),dofi(2)) = penalty;
+                   end
+                else
+                    A(dofi(1),dofi(1)) = penalty;
+                    A(dofi(2),dofi(2)) = penalty;
+                end
             end
         end
     end
