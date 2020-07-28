@@ -9,7 +9,7 @@ nu = 0.2;
 rho = 2440; % [kg/m^3]
 G0 = 3.8; % [J/m^2]
 % --- PD ----------
-m = 4; % mesh ration (m = horizon/h)
+m = 5; % mesh ration (m = horizon/h)
 h = horizon./m; % [m]
 omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - conical)
 par_omega = [horizon omega gamma];

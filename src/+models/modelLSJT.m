@@ -1,6 +1,6 @@
 classdef modelLSJT
      properties
-        b_linearity = true;
+        b_linearity = false;
         b_stiffnessAnal = true;
         b_dilatation = true;
         damage;
@@ -279,16 +279,16 @@ classdef modelLSJT
                 % Parameters
                 Vij = partialAreas(ii,iII)';
                 c1 = 1/V_delta * omegaj .* 1/horizon .* obj.c(1);
-                c2 = 1/V_delta * omegaj.*normaj * 1/horizon * obj.c(2);
+                c2 = 1/V_delta * omegaj.*normaj * 1/horizon^2 * obj.c(2);
                 g = omegaj.*normaj;
                 % U and V
                 if dofi(1) <= ndof || dofi(2) <= ndof
                     % First dof of node ii is free
   
-                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aii
-                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aip
-                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aij
-                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aijp
+                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA.*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aii
+                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA.*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aip
+                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA.*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aij
+                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA.*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aijp
                     
                     for Ij = 1:length(jj)
                         j = jj(Ij);
@@ -297,25 +297,23 @@ classdef modelLSJT
                         dofk = [idb(2*kk-1) idb(2*kk)];
                         eta_k = u(dofk) - u(dofj(Ij,:));
                         xi_k = x(kk,:) - x(j,:);
-                        M_k = eta_k+xi_k;
                         normak = vecnorm(xi_k,2,2); 
                         
-                        norma_etak = vecnorm(M_k,2,2);
                         omegak = influenceFunction(normak,par_omega);
                         
                         muk = 1;
                         if nargin > 12
                         muk = mu{j};
                         end
-                        PSI_jk = M_k./norma_etak;
+                        PSI_jk = xi_k./normak;
                         Vjk = partialAreas(j,iIII)';
                         % Parameters
                         gk = omegak.*normak;
                         
-                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:); 
-                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:);
-                        tk1 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
-                        tk2 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA.*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:); 
+                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA.*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:);
+                        tk1 = c2(Ij)*AA.*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        tk2 = c2(Ij)*AA.*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
                         
                         if dofi(1) <= ndof
                             A(dofi(1),dofk(:,1)) = A(dofi(1),dofk(:,1)) + tk1(:,1)' * V(ii);

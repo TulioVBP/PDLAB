@@ -76,6 +76,6 @@ end
 %% Adapting for the constrained dofs
 for ii = ndof+1:length(u)
     K(ii,:) = zeros(size(K(ii,:)));
-    K(ii,ii) = -1e10; % Penalty
+    K(ii,ii) = 1e10; % Penalty
 end
 end
