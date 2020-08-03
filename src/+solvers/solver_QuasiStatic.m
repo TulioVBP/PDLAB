@@ -13,29 +13,31 @@ end
 penalty = 1e10;
 %% Damage variables 
 %{Defining cracking trespassing matrix}
-    %if damage.damageOn
-        crackSegments = size(damage.crackIn,1); % At least 2
-        damage.checkCrack = zeros(size(model.history.S));
-        for ii = 1:size(model.history.S)
-            x_j = x(family(ii,family(ii,:)~=0),:);
-            check = zeros(size(x_j,1),crackSegments-1);
-            for kk = 1:crackSegments-1
-                for jj = 1:size(x_j,1)
-                [~,check(jj,kk)] = neighborhood.checkBondCrack(x(ii,:),x_j(jj,:),damage.crackIn(kk,:),damage.crackIn(kk+1,:));
-                end
+    free_points = zeros(size(x,1),1);
+    crackSegments = size(damage.crackIn,1); % At least 2
+    damage.checkCrack = zeros(size(model.history.S));
+    for ii = 1:size(model.history.S)
+        x_j = x(family(ii,family(ii,:)~=0),:);
+        check = zeros(size(x_j,1),crackSegments-1);
+        for kk = 1:crackSegments-1
+            for jj = 1:size(x_j,1)
+            [~,check(jj,kk)] = neighborhood.checkBondCrack(x(ii,:),x_j(jj,:),damage.crackIn(kk,:),damage.crackIn(kk+1,:));
             end
-            check = check';
-            if isempty(check)
-               brokenBonds = logical(zeros(size(x_j,1),1));
-            elseif size(check,1) == 1
-               brokenBonds = logical(check);
-            else
-               brokenBonds = any(check);
-            end
-            damage.brokenBonds(ii,1:length(x_j)) = brokenBonds; 
         end
-        disp('Check for broken bonds done.')
-    %end
+        check = check';
+        if isempty(check)
+           brokenBonds = logical(zeros(size(x_j,1),1));
+        elseif size(check,1) == 1
+           brokenBonds = logical(check);
+        else
+           brokenBonds = any(check);
+        end
+        damage.brokenBonds(ii,1:length(x_j)) = brokenBonds;
+        if all(brokenBonds == 1) % If bonds are broken
+            free_points(ii) = 1; % Free point
+        end
+    end
+    disp('Check for broken bonds done.')
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
     phi = zeros(length(x),n_tot); % Damage index
@@ -56,6 +58,13 @@ end
     for kk = 1:length(x)
         dof_vec(kk,:) = [idb(2*kk-1) idb(2*kk)];
     end
+% Define the set of degrees of freedom that are free, i.e., no bonds
+% connected
+free_dof = zeros(2*length(x),1);
+index_free_points = find(free_points);
+for kk = index_free_points
+    free_dof(dof_vec(kk,:)) = 1;
+end
 
 for n = 1:n_tot
     %% Step 2 - Update the load step n <- n + 1 and pseudo-time t. Update the boundary conditions.
@@ -93,9 +102,9 @@ for n = 1:n_tot
                 K = model.analyticalStiffnessMatrix(x,u_trial,ndof,idb,family,partialAreas,surfaceCorrection,V,par_omega,damage,history);
             end
             disp('Stiffness matrix done.')
-            du = -K\r_vec;
+            du = -K(~free_dof,~free_dof)\r_vec(~free_dof);
             disp('Incremental solution found.')
-            u_trial = u_trial + alpha*du;
+            u_trial(~free_dof) = u_trial(~free_dof) + alpha*du;
             [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,u_trial,bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_setn,V_DOF,par_omega,model,damage,history); % Update to include arbitrary displacement kinematic conditions
             r = norm(r_vec(1:ndof),Inf);
             %r_max = epsilon*max(norm(bn*V,Inf),norm(r_vec-bn*V,Inf));
@@ -125,9 +134,9 @@ for n = 1:n_tot
         if ~isempty(bc_set)
             ff(ndof+1:end) = -penalty*bc_set(:,2)*(n/n_tot);
         end
-        du = -K\(ff);
+        du = -K(~free_dof,~free_dof)\ff(~free_dof);
         disp("Solution found for the step " + int2str(n) + " out of " + int2str(n_tot))
-        un(:,n) = u_trial + du;
+        un(~free_dof,n) = u_trial(~free_dof) + du;
         [r_vec,history,phi(:,n),f_int(:,n)] = getForce(x,un(:,n),bn,family,partialAreas,surfaceCorrection,dof_vec,idb,ndof,bc_set,V_DOF,par_omega,model,damage,history); % Update to include arbitrary displacement kinematic conditions
         r = norm(r_vec(1:ndof),Inf);
     end

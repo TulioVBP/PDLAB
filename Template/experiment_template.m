@@ -3,7 +3,7 @@ close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.05; % [m]
+horizon = 0.04; % [m]
 E = 72e9; % [Pa]
 nu = 0.2;
 rho = 2440; % [kg/m^3]
@@ -16,22 +16,22 @@ par_omega = [horizon omega gamma];
 PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
 dt = 1;%0.5e-6; % Time step
-
+dt = 1e-6; % For dynamic solver
 % --- Mesh -----------------
 a = 0.15; % height [m]
 b = 1; % length [m]
-[x,A] = mesh.generateMesh(h,[a b]); % Generates rectangular mesh 
+[x,A] = mesh.generateMesh(h,[a b],'expansive'); % Generates rectangular mesh 
 
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
-damage.crackIn = [];%[-0.3 -0.075;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.crackIn = [-0.3 -0.077;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
 damage.damageOn = false; % True if applying damage to the model, false if not
 model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
-solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
-[model,damage,modelo] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
+solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
+[modelo,damage] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
 %% SIMULATION
 b_parallelComp = false; % true for parallel computation

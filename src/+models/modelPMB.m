@@ -210,6 +210,11 @@ classdef modelPMB
                 muj = 1;
                 if nargin > 12 % damage factor provided
                     muj = mu{ii};
+                elseif nargin > 10 % Damage parameters provided
+                   S = (vecnorm(eta+xi,2,2) - normaj)./normaj; % Calculate stretch
+                   history_S = obj.updateHistory(S,history.S(ii,iII));
+                   noFail = damage.noFail(ii) | damage.noFail(jj);
+                   muj = obj.damageFactor(history_S',ii,1:length(jj),damage,noFail); 
                 end               
                 % U
                 if dofi(1) <= ndof
@@ -224,7 +229,7 @@ classdef modelPMB
                     A(dofi(1),dofj(:,2)) = tj2u';
                else
                     % Constraint nodes
-                    A(dofi(1),dofi(1)) = penalty;
+                    A(dofi(1),dofi(1)) = -penalty;
                end
                if dofi(2) <= ndof
                   % V

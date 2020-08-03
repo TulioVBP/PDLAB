@@ -31,7 +31,9 @@ switch type
     case default 
     disp("Type "+type+ " doesn't exist.")
 end
+
 A = h^2; % Elements' area
 % Symmetry
 x = x - [(max(x(:,1))+min(x(:,1)))/2 (max(x(:,2))+min(x(:,2)))/2];
+
 end

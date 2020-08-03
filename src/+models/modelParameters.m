@@ -1,4 +1,4 @@
-function [model,damage,modelo] = modelParameters(model,par_omega,damage,E,nu,G0,dt)
+function [modelo,damage] = modelParameters(model,par_omega,damage,E,nu,G0,dt)
 % INPUTS
 % - model: the constitutive model you are using. Implemented models are:
 % "DTT", "PMB", "LBB", "LSJ", "LSJ-T","LPS-T"

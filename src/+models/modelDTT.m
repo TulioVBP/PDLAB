@@ -1,7 +1,7 @@
 classdef modelDTT
     properties
         b_linearity = false;
-        b_stiffnessAnal = false;
+        b_stiffnessAnal = true;
         b_dilatation = false;
         number = 1;
         damage;
@@ -76,7 +76,7 @@ classdef modelDTT
             xi = x_j - x_i; % \xi
             eta = u_j - u_i; % \eta
             norma = vecnorm(xi')'; 
-            S = (vecnorm(eta'+xi')' - norma)./norma; % Calculate stretch
+            S = (vecnorm(eta+xi,2,2) - norma)./norma; % Calculate stretch
             ee = (eta + xi)./vecnorm(eta'+xi')'; % Versor
             % Updating maximum stretch
             history = obj.updateHistory(S,history);
@@ -188,6 +188,78 @@ classdef modelDTT
                 % Update
                 obj.history.S = values;
             end
+        end
+        
+        function A = analyticalStiffnessMatrix(obj,x,u,ndof,idb,familySet,partialAreas,surfaceCorrection,V,par_omega,damage,history,mu)
+            C = obj.c(1)/2*weightedVolume(par_omega);
+            u = u';
+            penalty = 1e10;
+            N = size(x,1);
+            A = zeros(2*N,2*N); % 2N GDLs
+            m = weightedVolume(par_omega)*ones(length(x),1);
+           
+            for ii = 1:N
+                dofi = [idb(2*ii-1) idb(2*ii)];
+                family = familySet(ii,familySet(ii,:)~=0);
+                iII = 1:length(family);
+                jj = family'; % j sum
+                dofj = [idb(2*jj-1) idb(2*jj)];
+                eta = u(dofj) - u(dofi);
+                xi = x(jj,:) - x(ii,:);
+                M = eta+xi;
+                normaj = vecnorm(xi')'; 
+                norma_eta = vecnorm(M')';
+                omegaj = influenceFunction(normaj,par_omega);
+                
+                % Damage related parameters
+                muj = 1;
+                ff_coef = 1;
+                if nargin > 12 % damage factor provided
+                    muj = mu{ii};
+                elseif nargin > 10 % Damage parameters provided
+                   S = (vecnorm(eta+xi,2,2) - normaj)./normaj; % Calculate stretch
+                   history_S = obj.updateHistory(S,history.S(ii,iII));
+                   noFail = damage.noFail(ii) | damage.noFail(jj);
+                   muj = obj.damageFactor(history_S',ii,1:length(jj),damage,noFail);
+                   if damage.damageOn
+                       S0 = [-0.98 0.95*model.damage.Sc]; % S0- and S0+
+                       S1 = [-0.99 1.05*model.damage.Sc]; % S1- and S1+
+                       ff_coef = ( (S>S1(1)).*(S<S0(1)).*(S0(1)*(S-S1(1))./(S0(1) - S1(1))) + (S>=S0(1)).*(S<=S0(2)).*S ...
+                                + (S>S0(2)).*(S<S1(2)).*(S0(2)*(S1(2)-S)./(S1(2)-S0(2)))) ./ S;
+                   end
+                end
+                
+                % U
+                if dofi(1) <= ndof
+                    % First dof of node ii is free
+                    ti1u = C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii); % Aii
+                    ti2u = C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii); % Aip
+                    tj1u = -C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);% Aij
+                    tj2u = -C*(1./m(jj) + 1/m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,1).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);% Aijp
+                    A(dofi(1),dofi(1)) = sum(ti1u);
+                    A(dofi(1),dofj(:,1)) = tj1u';
+                    A(dofi(1),dofi(2)) = sum(ti2u);
+                    A(dofi(1),dofj(:,2)) = tj2u';
+               else
+                    % Constraint nodes
+                    A(dofi(1),dofi(1)) = -penalty;
+               end
+               if dofi(2) <= ndof
+                  % V
+                   ti1v = C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);
+                   ti2v = C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);
+                   tj1v = -C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,1)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);
+                   tj2v = -C*(1./m(jj) + 1./m(ii)).*(omegaj./(norma_eta).^2.*M(:,2)).*M(:,2).*partialAreas(ii,iII)'.*surfaceCorrection(ii,iII)'.*ff_coef.*muj.*V(ii);
+                   A(dofi(2),dofi(1)) = sum(ti1v);
+                   A(dofi(2),dofj(:,1)) = tj1v';
+                   A(dofi(2),dofi(2)) =sum(ti2v);
+                   A(dofi(2),dofj(:,2)) = tj2v';
+               else
+                    % Constraint nodes
+                    A(dofi(2),dofi(2)) = -penalty;
+               end
+            end
+            A = -A;
         end
    end
 end

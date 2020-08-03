@@ -46,7 +46,7 @@ else
     a1 = (x2(2) - x1(2))/(x2(1) - x1(1));
     a2 = (x4(2) - x3(2))/(x4(1) - x3(1)); % Should be equal
     %
-    if a1 == Inf
+    if a1 == Inf || a1 == -Inf
        % Invert the definition
        a1 = (x2(1) - x1(1))/(x2(2) - x1(2));
        b1 = x1(1) - a1*x1(2);

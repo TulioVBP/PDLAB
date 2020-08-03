@@ -223,25 +223,38 @@ classdef modelLPST
                 norma_eta = vecnorm(M,2,2);
                 omegaj = influenceFunction(normaj,par_omega);
                 
+                % Damage related parameters
                 muj = 1;
-                if nargin > 12 % if mu is provided
-                muj = mu{ii};
+                ff_coef = 1;
+                if nargin > 12 % damage factor provided
+                    muj = mu{ii};
+                elseif nargin > 10 % Damage parameters provided
+                   S = (vecnorm(eta+xi,2,2) - normaj)./normaj; % Calculate stretch
+                   history_S = obj.updateHistory(S,history.S(ii,iII)');
+                   noFail = damage.noFail(ii) | damage.noFail(jj);
+                   muj = obj.damageFactor(history_S',ii,1:length(jj),damage,noFail);
+                   if damage.damageOn
+                       S0 = [-0.98 0.95*model.damage.Sc]; % S0- and S0+
+                       S1 = [-0.99 1.05*model.damage.Sc]; % S1- and S1+
+                       ff_coef = ( (S>S1(1)).*(S<S0(1)).*(S0(1)*(S-S1(1))./(S0(1) - S1(1))) + (S>=S0(1)).*(S<=S0(2)).*S ...
+                                + (S>S0(2)).*(S<S1(2)).*(S0(2)*(S1(2)-S)./(S1(2)-S0(2)))) ./ S;
+                   end
                 end
                 
                 PSI_ij = M./norma_eta;
                 % Parameters
                 Vij = partialAreas(ii,iII)';
-                c1 = obj.c(2)*omegaj;
-                c2 = c1_hat*AA/m(ii).*omegaj.*normaj;
-                g = omegaj.*normaj;
+                c1 = obj.c(2)*omegaj.*muj.*ff_coef;
+                c2 = c1_hat*AA/m(ii).*omegaj.*normaj.*muj;
+                g = omegaj.*normaj.*muj;
                 % U and V
                 if dofi(1) <= ndof || dofi(2) <= ndof
                     % First dof of node ii is free
   
-                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aii
-                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj).*sum(-c2.*Vij.*PSI_ij); % Aip
-                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aij
-                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*muj)*sum(c2.*Vij.*PSI_ij);% Aijp
+                    ti1 = sum(-2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)').*sum(-c2.*Vij.*PSI_ij); % Aii
+                    ti2 = sum(-2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*PSI_ij) + sum(AA/m(ii).*g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)').*sum(-c2.*Vij.*PSI_ij); % Aip
+                    tj1 = 2*c1.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)'.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,1).*Vij.*surfaceCorrection(ii,iII)')*sum(c2.*Vij.*PSI_ij);% Aij
+                    tj2 = 2*c1.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)'.*PSI_ij + AA/m(ii).*(g.*PSI_ij(:,2).*Vij.*surfaceCorrection(ii,iII)')*sum(c2.*Vij.*PSI_ij);% Aijp
                     
                     for Ij = 1:length(jj)
                         j = jj(Ij);
@@ -256,19 +269,25 @@ classdef modelLPST
                         norma_etak = vecnorm(M_k,2,2);
                         omegak = influenceFunction(normak,par_omega);
                         
+                        % Damage related parameters
                         muk = 1;
-                        if nargin > 12
-                        muk = mu{j};
+                        if nargin > 12 % damage factor provided
+                            muk = mu{j};
+                        elseif nargin > 10 % Damage parameters provided
+                           S = (vecnorm(eta_k+xi_k,2,2) - normak)./normak; % Calculate stretch
+                           history_S = obj.updateHistory(S,history.S(j,iIII)');
+                           noFail = damage.noFail(j) | damage.noFail(kk);
+                           muk = obj.damageFactor(history_S',j,iIII,damage,noFail);
                         end
                         PSI_jk = M_k./norma_etak;
                         Vjk = partialAreas(j,iIII)';
                         % Parameters
-                        gk = omegak.*normak;
+                        gk = omegak.*normak.*muk;
                         
-                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:); 
-                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk).*Vij(Ij).*PSI_ij(Ij,:);
-                        tk1 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
-                        tk2 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)'.*muk)*Vij(Ij).*PSI_ij(Ij,:);
+                        tj1(Ij,:) = tj1(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)').*Vij(Ij).*PSI_ij(Ij,:); 
+                        tj2(Ij,:) = tj2(Ij,:) - c2(Ij).*sum(AA/m(j).*gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)').*Vij(Ij).*PSI_ij(Ij,:);
+                        tk1 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,1).*Vjk.*surfaceCorrection(j,iIII)')*Vij(Ij).*PSI_ij(Ij,:);
+                        tk2 = c2(Ij)*AA/m(j).*(gk.*PSI_jk(:,2).*Vjk.*surfaceCorrection(j,iIII)')*Vij(Ij).*PSI_ij(Ij,:);
                         
                         if dofi(1) <= ndof
                             A(dofi(1),dofk(:,1)) = A(dofi(1),dofk(:,1)) + tk1(:,1)' * V(ii);
