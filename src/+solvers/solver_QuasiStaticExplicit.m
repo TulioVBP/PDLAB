@@ -353,7 +353,7 @@ n_iterMax = load_par.n_iterMax;
                 end
                 %lineLength = fprintf("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + "%. ETA: "+ num2str(time_up/n*(length(t)-n)));
                 disp("Load step " + num2str(kk) + " out of " + num2str(n_load) +": Time step "+ num2str(n) + " out of " + num2str(length(t_full)) + ". Criterion: " + crit_var(n) +...
-                    ". ETA: "+ num2str(time_up/n*(length(t_full)+n_iterMax-n)) + ". C = " + num2str(C))        
+                    ". ETA: "+ num2str(time_up/n*(length(t_full)+n_iterMax-n)) + " (avg. per timestep : " + num2str(time_up/n) + "). C = " + num2str(C))        
             end
             %% Conditions to finish simulation if load is applied through disp.
             
@@ -452,9 +452,9 @@ function dt = evaluateDeltaT(x,u,ndof,idb,family,partialAreas,surfaceCorrection,
     end
     % 1 - Define stiffness matrix
     if model.b_stiffnessAnal
-        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(V),par_omega,model,damage,history,mu);
+        K = model.analyticalStiffnessMatrix(x,u,ndof,idb,family,partialAreas,surfaceCorrection,ones(size(V)),par_omega,damage,history,mu);
     else
-        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,ones(V),surfaceCorrection,ndof,par_omega,model,damage,history);
+        K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,ones(size(V)),surfaceCorrection,ndof,par_omega,damage,history);
     end
     % 2 - Define lambda
     dt_vec = diag(eye(ndof));
