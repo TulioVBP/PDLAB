@@ -78,6 +78,9 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
             else
                 bc_set = [];
             end
+            [~, I, ~] = unique(bc_set(:,1));
+            bc_set = bc_set(I,:); % Solving for repeated constraints
+            
             % - Traction forces
             if ~isempty(pc.bodyForce)
                 if length(size(pc.bodyForce)) == 2

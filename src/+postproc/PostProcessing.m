@@ -107,7 +107,9 @@ function strainPlot(x,u)
                 EYY(iii,jjj) = eyy(ind);
                 EXY(iii,jjj) = exy(ind);
             else
-                disp('Error: problem with the matching condition')
+                EXX(iii,jjj) = NaN;
+                EYY(iii,jjj) = NaN;
+                EXY(iii,jjj) = NaN;
             end
         end        
     end
@@ -135,8 +137,30 @@ function displacementPlot(x,u)
     V = zeros(size(X));
     W = zeros(size(X));
     sz = flip(size(X));
-    V = reshape(u(:,1),sz)';
-    W = reshape(u(:,2),sz)';
+    if length(u) ~= numel(X)
+        for jjj = 1:size(X,2)
+            for iii = 1:size(Y,1)
+                coord = [X(1,jjj) Y(iii,1)];
+                ind = [];
+                for ii = 1:length(x)
+                   if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
+                       ind = ii;
+                       break;
+                   end
+                end
+                if ~isempty(ind)
+                    V(iii,jjj) = u(ind,1);
+                    W(iii,jjj) = u(ind,2);
+                else
+                    V(iii,jjj) = nan;
+                    W(iii,jjj) = nan;
+                end
+            end        
+        end
+    else
+        V = reshape(u(:,1),sz)';
+        W = reshape(u(:,2),sz)';
+    end
     figure
     subplot(2,1,1)
     surf(X,Y,V)
@@ -242,6 +266,7 @@ function energyPlot(x,energy,n_final)
             %ind = find(x(:,1) == X(1,jj) & x(:,2) == Y(ii,1)); not
             %reliable
             coord = [X(1,jjj) Y(iii,1)];
+            ind = [];
             for ii = 1:length(x)
                if x(ii,1) < coord(1) + 1e-10 && x(ii,1) > coord(1) - 1e-6  && x(ii,2) < coord(2) + 1e-10 && x(ii,2) > coord(2) - 1e-10
                    ind = ii;
@@ -251,7 +276,7 @@ function energyPlot(x,energy,n_final)
             if ~isempty(ind)
                 WW(iii,jjj) = energy.W(ind,n_final);
             else
-                disp('Error: problem with the matching condition')
+                WW(iii,jjj) = NaN;
             end
         end        
     end

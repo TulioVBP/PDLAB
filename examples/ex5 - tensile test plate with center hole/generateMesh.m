@@ -1,8 +1,8 @@
-function [x,A] = generateMesh(h,geometry,type)
+function [x,A] = generateMesh(h,geometry,rf,type)
 % [x,A] = generateMesh(h,geometry,type) is a function that takes a the grid
 % spacing, the geometry vector [height, variables] and the type of the mesh
 % ('inclusive', expansive')
-if nargin < 3
+if nargin < 4
     type = 'expansive';
 end
 a = geometry(1); % height [m]
@@ -33,7 +33,12 @@ switch type
 end
 
 A = h^2; % Elements' area
+
 % Symmetry
 x = x - [(max(x(:,1))+min(x(:,1)))/2 (max(x(:,2))+min(x(:,2)))/2];
+
+% Create hole
+r = vecnorm(x,2,2);
+x = x(r > rf,:);
 
 end
