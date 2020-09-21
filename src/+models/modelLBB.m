@@ -29,8 +29,7 @@ classdef modelLBB
             mm = weightedVolume(par_omega);
             % Random initialization
             obj.c = 6*E/mm;
-            obj.damage.Sc = G0/4;
-             
+            obj.damage.Sc = G0/4;             
         end
         %% Force vector state
         function [f,history,mu] = T(obj,x,u,ii,jj,dof_vec,par_omega,separatorDamage,damage,history,noFail)
@@ -67,9 +66,9 @@ classdef modelLBB
             history = obj.updateHistory(S,history);
             %mu = obj.damageFactor(history',ii,1:length(jj),damage,noFail);
             mu = 1;
+            
             %% Evaluating the force interaction
             f = obj.c.*influenceFunction(norma,par_omega).*norma.*S.*ee.*mu;
-
         end
         
         %% Strain energy density

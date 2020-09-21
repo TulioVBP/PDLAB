@@ -9,11 +9,11 @@ nu = 0.2;
 rho = 1000; % [kg/m^3]
 G0 = 3.8; % [J/m^2]
 % --- PD ----------
-m = 4; % mesh ration (m = horizon/h)
+m = 4; % mesh ratio (m = horizon/h)
 h = horizon./m; % [m]
 omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - conical)
 par_omega = [horizon omega gamma];
-PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
+PA_alg = "FA"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
 
 dt = 1e-6; % time step for dynamic solver
@@ -70,9 +70,10 @@ switch solver
         if damage.damageOn
             error('Disable damage to run a quasi-static solver')
         end
-        n_tot = 4; % Number of load steps
+        n_tot = 1; % Number of load steps
         [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,modelo,par_omega,ndof,A,damage,noFailZone);
         out.x = x; out.un = u_n; out.energy = energy;
+        save('teste.mat','x','idb','u_n','energy');
     case "Quasi-Static Explicit"
         load_par.n_iterMax = 50;
         load_par.n_load = 100; % Number of load steps
