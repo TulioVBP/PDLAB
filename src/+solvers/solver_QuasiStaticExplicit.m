@@ -1,15 +1,19 @@
 function [t_s,u_load,un_sample,index_s,phi_sample,energy,history,time_up,F_load,CC,damage] = solver_QuasiStaticExplicit(x,idb,body_force,...
-   bc_set,familyMat,A,partialAreas,surfaceCorrection,damping,model,par_omega,noFailZone,damage,b_parll,beta,load_par,data_dump)
+   bc_set,familyMat,A,partialAreas,surfaceCorrection,damping,model,par_omega,noFailZone,damage,b_parll,beta,load_par,data_dump,b_partialSim,perc_ps)
 % Unravel load parameters
 n_load = load_par.n_load;
 n_iterMax = load_par.n_iterMax;
 
 % Explicit time solver with dynamic relaxation for quasi-static experiments
-   if nargin < 20 % No data dump
+   if nargin < 17 % No data dump
         data_dump = 1;
+        b_partialSim = [false false];
+   elseif nargin < 18
+        b_partialSim = [false false];
    end
-
-    
+   if nargin < 19
+       perc_ps = 1;
+   end
     %% Create volume
     h = norm(x(1,:)-x(2,:));
     if length(A)== 1
@@ -138,10 +142,16 @@ n_iterMax = load_par.n_iterMax;
     fn_temp = zeros(size(x));
     phi_temp = zeros(length(x),1);
     
-    % {Recoverying temporary files}
     n_initial = 1;
+    kk = 0;
+    bc_set_part = bc_set;
+    crit_var = zeros(1,length(t)-1);
+    c_Kneg = 0;
+    C = 0;
     
-    if exist('tempsim.mat','file')
+    % {Recoverying temporary files}
+    n_final_load = floor(n_load*perc_ps);
+    if exist('tempsim.mat','file') && b_partialSim(1)
         load('tempsim.mat');
         n_initial = n;
         disp('Found a partial simulation. Continuing it...')
@@ -151,11 +161,7 @@ n_iterMax = load_par.n_iterMax;
     b_crack = true;
     b_load = true;
     b_finalIter = false;
-    kk = 0;
-    bc_set_part = bc_set;
-    crit_var = zeros(1,length(t)-1);
-    c_Kneg = 0;
-    C = 0;
+    
     
     while b_load
         %% #########  LOAD LOOP ##########
@@ -215,7 +221,6 @@ n_iterMax = load_par.n_iterMax;
             
             % {Evaluate f[n+1]}
             energy_pot = zeros(length(x),1); % Pre-allocate potential energy
-            energy_ext = zeros(length(x),1); % Pre-allocate external force 
             b_sampling = rem(n+1,data_dump) == 0 || (n+1 == n_fin && b_finalIter); % Deciding when to evaluate the energy
 
             if b_parll
@@ -337,7 +342,7 @@ n_iterMax = load_par.n_iterMax;
             if crit_var(n) < beta
                     disp("Convergence achieved for the load step " + num2str(kk) + " ...")
                     disp("Number of negative K's = " + int2str(c_Kneg))
-                    if kk == n_load
+                    if kk == n_final_load
                         b_load = false;
                     end
                     break
@@ -362,11 +367,11 @@ n_iterMax = load_par.n_iterMax;
             end
             
             %% EDIT HERE YOUR CONDITION FOR FINAL ITERATION
-            if n == n_fin && (~b_crack && abs(F_load(index_s,2)) < max(F_load(:,2))*1/6) || kk == n_load 
+            if n == n_fin && ((~b_crack && abs(F_load(index_s,2)) < max(F_load(:,2))*1/6) || kk == n_final_load) 
                 b_finalIter = true;
             end
             
-            if ~damage.damageOn && kk == n_load && n == n_fin
+            if ~damage.damageOn && kk == n_final_load && n == n_fin
                  b_load = false;
             end
             
@@ -378,6 +383,10 @@ n_iterMax = load_par.n_iterMax;
             end
         end
         u_load(:,kk) = u_n(:,1);
+    end
+    if b_partialSim(2)
+        clear n_final_load;
+        save('tempsim.mat')
     end
     [phi_sample,energy,un_sample,F_load] = cap_sample(phi_sample,energy,un_sample,F_load,index_s); % Eliminating last zeros, if any
 end
