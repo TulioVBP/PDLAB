@@ -54,7 +54,7 @@ n_iterMax = load_par.n_iterMax;
     %% INITIALIZE SIMULATION MATRICES
     ndof = 2*length(x) - size(bc_set,1); % Number of degree of freedoms
     u_load = zeros(2*length(x),n_load); % Displacement for load steps
-    mu = cell(length(x),n_load); % Damage factor initialization
+    mu = cell(length(x),2); % Damage factor initialization
     damage.phi = zeros(length(x),1); % Initializing phi in the damage structure
     history.S = model.history.S; %
     if model.b_dilatation
@@ -96,7 +96,7 @@ n_iterMax = load_par.n_iterMax;
     % Initial condition
     u_n = zeros(2*length(x),2); % 2*N x 2  2D matrix (length(t_full))
     v_n = zeros(2*length(x),2); % Velocity Verlet matrix [i i+1/2]: by initializing it to zero, the rigid motion is eliminated.
-    phi = zeros(length(x),length(t_full)); % No initial damage
+    phi = zeros(length(x),2); % No initial damage
     
     % Checking boundary conditions
     if size(body_force,2) ~= 1
@@ -170,7 +170,7 @@ n_iterMax = load_par.n_iterMax;
         body_force_part(:,1) = body_force*kk/n_load; % bn
         % Obtain data from previous simulation
         if kk >1
-            mu(:,kk) = mu(:,kk-1);
+            mu(:,1) = mu(:,2);
             n_initial = n+1;
         end
         F = zeros(2*length(x),2);
@@ -193,6 +193,7 @@ n_iterMax = load_par.n_iterMax;
             % #### Step 2 - Update displacement
             u_n(:,1) = u_n(:,2); % u(n) is stored in the u(1)
             u_n(1:ndof,2) = u_n(1:ndof,1) + dt*v_n(1:ndof,2); % u(n+1) - %u_n(:,(2*(n+1)-1):2*(n+1)) = u_n(:,(2*n-1):2*n) + dt*v_n(:,3:4); % u(n+1)
+            phi(:,1) = phi(:,2); % Update phi
              % ----- Solving for the displacement constraint nodes ----
             if ~isempty(u_const)
                 u_const = bc_set_part(:,2); % Defining the displacements for the nodes with no velocity
@@ -203,7 +204,7 @@ n_iterMax = load_par.n_iterMax;
 
             % ---- {Evaluating dilatation} ----
            
-            damage.phi = phi(:,n); % Accessing current damage situation
+            damage.phi = phi(:,1); % Accessing current damage situation
             if model.b_dilatation
                 if b_parll
                     parfor ii = 1:length(x)
@@ -225,11 +226,11 @@ n_iterMax = load_par.n_iterMax;
 
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,2},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,kk},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
+                   [fn_temp(ii,:),history_tempS(ii,:),mu{ii,2},phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,dt,history,A,theta,b_sampling);
 
                 end
             end
@@ -239,7 +240,7 @@ n_iterMax = load_par.n_iterMax;
                 fn(dof_vec(ii,:)) = fn_temp(ii,:)';
             end
             history.S = history_tempS; % Updating the history variable related to the stretch
-            phi(:,n+1) = phi_temp;
+            phi(:,2) = phi_temp;
       
             % Evaluate V(n+1)
             an =  lambda_inv .* (fn(1:ndof) + bn(1:ndof) - C * lambda.* v_n(1:ndof,2)); % A(n+1)
@@ -346,7 +347,7 @@ n_iterMax = load_par.n_iterMax;
                         b_load = false;
                     end
                     break
-            elseif sum(phi(:,n+1) > phi(:,n)) && n > 2 && b_crack
+            elseif sum(phi(:,2) > phi(:,1)) && n > 2 && b_crack
                 disp("Crack nucleation (propagation) observed at time step " + int2str(n))
                 b_crack = false;
                 disp('Ignore break and propagate simulation.')
