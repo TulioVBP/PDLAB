@@ -386,7 +386,7 @@ n_iterMax = load_par.n_iterMax;
     end
     if b_partialSim(2)
         clear n_final_load;
-        save('tempsim.mat')
+        save('tempsim.mat','-v7.3')
     end
     [phi_sample,energy,un_sample,F_load] = cap_sample(phi_sample,energy,un_sample,F_load,index_s); % Eliminating last zeros, if any
 end
