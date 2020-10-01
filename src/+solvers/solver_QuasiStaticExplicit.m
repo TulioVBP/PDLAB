@@ -368,7 +368,7 @@ n_iterMax = load_par.n_iterMax;
             end
             
             %% EDIT HERE YOUR CONDITION FOR FINAL ITERATION
-            if n == n_fin && ((~b_crack && abs(F_load(index_s,2)) < max(F_load(:,2))*1/6) || kk == n_final_load) 
+            if n == n_fin && ((~b_crack && abs(F_load(index_s,2)) < max(F_load(:,2))*beta) || kk == n_final_load) 
                 b_finalIter = true;
             end
             
