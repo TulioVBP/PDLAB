@@ -1,6 +1,6 @@
 % Explicit time - dynamic solver
 
-function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,rho,model,par_omega,noFailZone,damage,b_parll,data_dump)
+function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,rho,model,par_omega,noFailZone,damage,b_parll,data_dump)
     if nargin < 15 % No data dump
         data_dump = 1;
     end
@@ -83,14 +83,15 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         energy.KE = zeros(length(x),length(n_sample));
         energy.EW = zeros(length(x),length(n_sample));
         energy_ext_var = zeros(length(x),1); % External energy that takes into account variable body force (velocity constraints)
+        F_load = zeros(length(n_sample),2);
         fn = zeros(2*length(x),1); % Initial force
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
         % Temporary variables
-        history_S = model.history.S; %
+        history.S = model.history.S; %
         if model.b_dilatation 
-             history_T = model.history.theta;
+             history.T = model.history.theta;
         else
-             history_T = [];
+             history.T = [];
         end
         fn_temp = zeros(size(x));
         phi_temp = zeros(length(x),1);
@@ -132,12 +133,12 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             if model.b_dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_T(ii)] = model.dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history_T(ii));
+                        [theta(ii),history_T(ii)] = model.dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.T(ii));
                     end
                 else
-                    [theta,history_T] = model.dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history_S,history_T);
+                    [theta,history_T] = model.dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history.S,history.T);
                 end
-                %model.history.theta = history_tempT; % Assigning up-to-date history variable
+                history.theta = history_T; % Assigning up-to-date history variable
             end
             
             % ####### Step 3 - Update velocity 
@@ -148,13 +149,14 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history_S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history.S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history_S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history.S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
                 end
             end
+            history.S = history_S;
             % Converting the temporary variables
             for ii = 1:length(x)
                 fn(dof_vec(ii,:)) = fn_temp(ii,:)';
@@ -200,6 +202,8 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                     dofk = dof_vec(kk,:);
                     energy.KE(kk,index_s) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
                 end
+                % Calculating load 
+                F_load(index_s,:) = fload(x,u2,familyMat,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,A,bc_set,idb,ndof); 
             else
                  % {External incremental work only}
                 BBN = bn(:,1);
@@ -223,6 +227,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                     ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
                     energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
                 end
+                
             end
             
             %% ############ COUNTING THE PROCESSING TIME #############
@@ -233,7 +238,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         % Sampling the results
         [u_n] = sampling(u_n,t,t_s);
         [phi] = sampling(phi,t,t_s);
-        history.S = history_S;
+        %history.S = history_S;
 end
 %%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
@@ -297,4 +302,37 @@ function [xs] = sampling(x,t,ts)
     for iii = 1:size(x,1)
         xs(iii,:) = interp1(t,x(iii,:),ts);
     end
+end
+
+%% Calculating load
+function F = fload(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,V,bc_set,idb,ndof) 
+F = [0 0];
+const_dof = find(idb > ndof);
+load_dof = const_dof(bc_set(:,3)~= 0);
+load_points = ceil(load_dof/2);
+load_points = unique(load_points);
+for ii = 1:length(load_points)
+    family_ii = family(ii,family(ii,:)>0);
+    neig_index = 1:length(family_ii);
+    partialAreas_ii = partialAreas(ii,family(ii,:)>0);
+    surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
+    f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
+    F = F - f_i*V(ii);
+end
+end
+
+function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta)
+   jj = family;
+   % Loop on their neighbourhood
+   noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+   Vj = partialAreas';
+   if model.b_dilatation
+      [fij,~,~] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),history.theta,noFail);
+   else
+      [fij,~,~] = model.T(x,u_n,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),noFail);
+   end
+   lambda = surfaceCorrection';
+   
+   f_i = sum(fij.*Vj.*lambda);
+   
 end

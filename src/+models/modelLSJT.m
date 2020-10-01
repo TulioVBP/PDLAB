@@ -47,6 +47,7 @@ classdef modelLSJT
             else
                 obj.damage.alfa = 0; obj.damage.beta = 0; obj.damage.gamma = 1; % No dependency
             end
+            obj.damage.xc = (0.05)^2/(1+1.05^2) * obj.dt;
         end
         
         function [theta,historyT] = dilatation(obj,x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,damage,historyS,historyT)
@@ -183,7 +184,7 @@ classdef modelLSJT
             % HT
             HT = ones(length(x{1}),1);
             if damage.damageOn
-                xc = (0.05)^2/(1+1.05^2) * obj.dt; % js(Sc)*dt = 2.3781e-11
+                xc = obj.damage.xc; % js(Sc)*dt = 2.3781e-11
                 HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
                 HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
             end
