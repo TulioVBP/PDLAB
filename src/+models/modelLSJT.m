@@ -191,8 +191,8 @@ classdef modelLSJT
                 xc = obj.damage.xc; % js(Sc)*dt = 2.3781e-11
                 HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
                 HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
-                HDi = 1;
-                HDj = 1;
+                %HDi = 1;
+                %HDj = 1;
             end
             % Deal with initial broken bonds
             if isfield(damage,'brokenBonds')
