@@ -31,6 +31,9 @@ switch model.name
 
     case "LSJ-T"
         modelo = models.modelLSJT(E,nu,par_omega,damage,G0,dt);
+        
+    case "LSJ-T2"
+        modelo = models.modelLSJT2(E,nu,par_omega,damage,G0,dt);
 
     case "LSJ"
             %% Lipton

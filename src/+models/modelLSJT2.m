@@ -1,4 +1,5 @@
-classdef modelLSJT
+classdef modelLSJT2
+    %% Class for simulating Lipton experiments
      properties
         b_linearity = false;
         b_stiffnessAnal = true;
@@ -39,16 +40,15 @@ classdef modelLSJT
             else
                 warning('Critical bond not defined.')
             end
-            obj.damage.thetaC_p = 3; % Very high value to not be activated
-            obj.damage.thetaC_m = -3; % Very low value to not be activated 
+            obj.damage.Sc = 5e-6;
             % Damage dependent Sc
             if damage.DD
                 obj.damage.alfa = 0.2; obj.damage.beta = 0.2; obj.damage.gamma = 1.4;
             else
                 obj.damage.alfa = 0; obj.damage.beta = 0; obj.damage.gamma = 1; % No dependency
             end
-            obj.damage.xc = (0.05)^2/(1+1.05^2) * obj.dt;
-            obj.damage.thetaC = 3;
+            obj.damage.xc = 0.15;
+            obj.damage.thetaC = 0.01;
         end
         
         function [theta,historyT] = dilatation(obj,x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,damage,historyS,historyT)
@@ -191,8 +191,8 @@ classdef modelLSJT
                 xc = obj.damage.xc; % js(Sc)*dt = 2.3781e-11
                 HT = (x{1}<xc).*(exp(1-1./(1-(x{1}/xc).^2.01)));
                 HT(isnan(HT)) = zeros(sum(sum(isnan(HT))),1);
-                HDi = 1;
-                HDj = 1;
+                HDi = (x{2}<xc).*(exp(1-1./(1-(x{2}/xc).^2.01)));
+                HDj = (x{3}<xc).*(exp(1-1./(1-(x{3}/xc).^2.01)));
             end
             % Deal with initial broken bonds
             if isfield(damage,'brokenBonds')
@@ -382,8 +382,8 @@ classdef modelLSJT
 end
 
 function ff = fscalar(x,norma,c,damageOn,Sc)
-r1 = Sc*sqrt(norma);
-%r1 = 3; % Uncomment for a better result
+%r1 = Sc*sqrt(norma);
+r1 = 3; % Uncomment for a better result
 r2 = r1;
 if damageOn
     ff = (x.*sqrt(norma) <= r1).*c(1).*x.*sqrt(norma)...
@@ -394,7 +394,7 @@ end
 end
 
 function gg = gscalar(x,c,damageOn,thetaC)
-r1 = thetaC;
+r1 = 3;
 r2 = r1;
 if damageOn
     %gg = (x<=r1).*c(2).*x + (x>2)*1;
@@ -414,8 +414,8 @@ function jj = jth(x,thetac)
 end
 
 function ff = f_potential(S,norma,c,damage,Sc)
-r1 = Sc.*norma;
-%r1 = 3; % Uncomment for a better result
+%r1 = Sc.*norma;
+r1 = 3; % Uncomment for a better result
 r2 = r1;
 x = S.*norma;
 if damage.damageOn
@@ -426,7 +426,7 @@ end
 end
 
 function gg = g_potential(x,c,damage,thetaC)
-r1 = thetaC;
+r1 = 3;
 r2 = r1;
 if damage.damageOn
     %gg = (x <= r1).*c(2).*x.^2/2 + (x > r2).*x;

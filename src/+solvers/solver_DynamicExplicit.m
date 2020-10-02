@@ -269,7 +269,7 @@ function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii
    neig_index = 1:length(family);
    jj = family(neig_index);
    % Loop on their neighbourhood
-   history_S_up = history_S; 
+   history_S_up = history_S();%(neig_index); 
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
    if model.b_dilatation
       [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),history_T,noFail);
@@ -306,7 +306,7 @@ end
 
 %% Calculating load
 function F = fload(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,V,bc_set,idb,ndof) 
-F = [0 0];
+F = [0, 0];
 const_dof = find(idb > ndof);
 load_dof = const_dof(bc_set(:,3)~= 0);
 load_points = ceil(load_dof/2);
@@ -317,7 +317,7 @@ for ii = 1:length(load_points)
     partialAreas_ii = partialAreas(ii,family(ii,:)>0);
     surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
     f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
-    F = F - f_i*V(ii);
+    F = F + f_i*V(ii);
 end
 end
 
