@@ -1,4 +1,4 @@
-classdef modelLSJT2
+classdef modelLSJ
     %% Class for simulating Lipton experiments
      properties
         b_linearity = false;
@@ -11,7 +11,7 @@ classdef modelLSJT2
         dt;
      end
     methods
-        function obj = modelLSJT2(E,nu,par_omega,damage,G0,dt)
+        function obj = modelLSJ(E,nu,par_omega,damage,G0,dt)
             %% Pre Initialization %%
              % Any code not using output argument (obj)
              if nargin == 0
@@ -78,14 +78,10 @@ classdef modelLSJT2
                     else
                         Sc = obj.damage.Sc;
                     end
-                    history_upS = obj.updateHistory(S_linear,historyS(ii,neigh_ind)',Sc);
-                    XX = {history_upS, historyT(ii), historyT(jj)}; 
-                    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-                    [H,~,~] = obj.damageFactor(XX,ii,1:length(jj),damage,noFail);
                 else
                     H = 1;
                 end
-                theta(transv_ind) = sum(theta_vec.*H); % Tulio's model
+                theta(transv_ind) = sum(theta_vec); % Tulio's model
                 transv_ind = transv_ind + 1;
             end
             historyT(transvList) = obj.updateHistoryT(theta(transvList),historyT(transvList));
@@ -148,7 +144,7 @@ classdef modelLSJT2
             % Tensile term Lt
             ft = 2/V_delta*influenceFunction(norma,par_omega)./horizon.*Ht.*fscalar(sqrt(norma).*S,norma,obj.c,damage.damageOn).*ee;
             % Dilatation term Ld
-            fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*Ht.*(Hd_y.*gscalar(theta_j,obj.c,damage.damageOn,obj.damage.thetaC) + Hd_x.*gscalar(theta_i,obj.c,damage.damageOn,obj.damage.thetaC)).*ee;
+            fd = 1/V_delta*influenceFunction(norma,par_omega)./horizon^2.*norma.*(Hd_y.*gscalar(theta_j,obj.c,damage.damageOn,obj.damage.thetaC) + Hd_x.*gscalar(theta_i,obj.c,damage.damageOn,obj.damage.thetaC)).*ee;
             % Final force
             f = fd + ft;
             mu = Ht; % Check for damage in this model

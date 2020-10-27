@@ -311,13 +311,14 @@ const_dof = find(idb > ndof);
 load_dof = const_dof(bc_set(:,3)~= 0);
 load_points = ceil(load_dof/2);
 load_points = unique(load_points);
-for ii = 1:length(load_points)
+for kk = 1:length(load_points)
+    ii = load_points(kk);
     family_ii = family(ii,family(ii,:)>0);
     neig_index = 1:length(family_ii);
     partialAreas_ii = partialAreas(ii,family(ii,:)>0);
     surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
     f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
-    F = F + f_i*V(ii);
+    F = F - f_i*V(ii);
 end
 end
 
