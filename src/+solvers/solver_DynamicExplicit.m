@@ -153,7 +153,7 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history.S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history,dt,A,body_force,theta,b_Weval,bc_set);
                 end
             end
             history.S = history_S;
@@ -263,18 +263,18 @@ function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt_crit = min(dt); % Critical time step
 end
 %%
-function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi,history_S,history_T,dt,A,body_force,theta,b_Weval,bc_set)
+function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi,history,dt,A,body_force,theta,b_Weval,bc_set)
    % Loop on the nodes
    family = familyMat(ii,familyMat(ii,:)~=0);
    neig_index = 1:length(family);
    jj = family(neig_index);
    % Loop on their neighbourhood
-   history_S_up = history_S();%(neig_index); 
+   history_S_up = history.S(ii,:);%(neig_index); 
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
    if model.b_dilatation
-      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),history_T,noFail);
+      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S_up(neig_index),history.theta,noFail);
    else
-      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S(neig_index),noFail);
+      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S_up(neig_index),noFail);
    end
    Vj = partialAreas(ii,neig_index)';
    lambda = surfaceCorrection(ii,neig_index)';
@@ -288,7 +288,7 @@ function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii
            % Strain energy
            W = model.strainEnergyDensity(x,u_n,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index));
        else
-           W = model.strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index),history_T); % neig_index == length(family)
+           W = model.strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index),history.theta); % neig_index == length(family)
        end
        % Stored strain energy
        energy_pot = W.*A(ii);
@@ -308,17 +308,19 @@ end
 function F = fload(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,V,bc_set,idb,ndof) 
 F = [0, 0];
 const_dof = find(idb > ndof);
-load_dof = const_dof(bc_set(:,3)~= 0);
-load_points = ceil(load_dof/2);
-load_points = unique(load_points);
-for kk = 1:length(load_points)
-    ii = load_points(kk);
-    family_ii = family(ii,family(ii,:)>0);
-    neig_index = 1:length(family_ii);
-    partialAreas_ii = partialAreas(ii,family(ii,:)>0);
-    surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
-    f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
-    F = F - f_i*V(ii);
+if ~isempty(bc_set)
+    load_dof = const_dof(bc_set(:,3)~= 0);
+    load_points = ceil(load_dof/2);
+    load_points = unique(load_points);
+    for kk = 1:length(load_points)
+        ii = load_points(kk);
+        family_ii = family(ii,family(ii,:)>0);
+        neig_index = 1:length(family_ii);
+        partialAreas_ii = partialAreas(ii,family(ii,:)>0);
+        surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
+        f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
+        F = F - f_i*V(ii);
+    end
 end
 end
 

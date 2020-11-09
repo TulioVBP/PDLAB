@@ -40,15 +40,15 @@ classdef modelLSJT2
             else
                 warning('Critical bond not defined.')
             end
-            obj.damage.Sc = 5e-6;
+            %obj.damage.Sc = 5e-6;
             % Damage dependent Sc
             if damage.DD
                 obj.damage.alfa = 0.2; obj.damage.beta = 0.2; obj.damage.gamma = 1.4;
             else
                 obj.damage.alfa = 0; obj.damage.beta = 0; obj.damage.gamma = 1; % No dependency
             end
-            obj.damage.xc = 0.15;
-            obj.damage.thetaC = 0.01;
+            obj.damage.xc = (0.05)^2/(1+1.05^2) * obj.dt;
+            obj.damage.thetaC = 0.0022;
         end
         
         function [theta,historyT] = dilatation(obj,x,u,family,partialAreas,surfaceCorrection,transvList,idb,par_omega,damage,historyS,historyT)
