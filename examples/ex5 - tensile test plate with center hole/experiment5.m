@@ -1,47 +1,46 @@
-function out = experiment_template()
+function out = experiment5()
 close all
 clc
 %% PARAMETERS
 % --- Material --------
-horizon = 0.04; % [m]
-E = 72e9; % [Pa]
+horizon = 1/20; % [m]
+E = 1; % [Pa]
 nu = 0.2;
-rho = 2440; % [kg/m^3]
+rho = 1000; % [kg/m^3]
 G0 = 3.8; % [J/m^2]
 % --- PD ----------
-m = 5; % mesh ration (m = horizon/h)
+m = 4; % mesh ratio (m = horizon/h)
 h = horizon./m; % [m]
 omega = 3; gamma = 1;% Influence function options (1 - Exp., 2 - constant, 3 - conical)
 par_omega = [horizon omega gamma];
-PA_alg = "PA-HHB"; % "FA", "PA-HHB", "PA-AC"
+PA_alg = "FA"; % "FA", "PA-HHB", "PA-AC"
 SE_alg = "None"; % "None", "Volume method"
-dt = 1;%0.5e-6; % Time step
-dt = 1e-6; % For dynamic solver
+
+dt = 1e-6; % time step for dynamic solver
+
 % --- Mesh -----------------
-a = 0.15; % height [m]
-b = 1; % length [m]
-[x,A] = mesh.generateMesh(h,[a b],'expansive'); % Generates rectangular mesh 
+a = 0.2; % height [m]
+b = 1 + 2*horizon; % length [m]
+[x,A] = generateMesh(h,[a b],a/4,'expansive'); % Generates rectangular mesh 
 
 % --- Initial damage ----
 notch_length = 0.05; % Example 5 cm
-damage.crackIn = [-0.3 -0.077;-0.3 -0.075+notch_length]; % Coordinates of the crack initial segment
+damage.crackIn = []; % Coordinates of the crack initial segment
 damage.DD = false; % Damage dependent criteria
 
 % ---- MODEL ---------
 damage.damageOn = false; % True if applying damage to the model, false if not
-model.name = "LSJ-T"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
-solver = "Quasi-Static Explicit"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
+model.name = "LBB"; % "PMB", "DTT", "LBB", "LSJ-T", "LPS-T", "Linearized LPS"
+solver = "Quasi-Static"; % "Quasi-Static", "Dynamic/Explicit", "Quasi-Static Explicit"
 [modelo,damage] = models.modelParameters(model,par_omega,damage,E,nu,G0,dt); % Check if it works    
 
 %% SIMULATION
 b_parallelComp = false; % true for parallel computation
 
 % -------------- Boundary conditions ----------------
-sigmay = 6; % [MPa] Example 
-stresses = [0 sigmay 0]*1e6; % Example [sigma_x, sigma_y, tau_xy] - Pa/m^2 (set it to [] if not used)
 stress_app = '-'; %'-' means BC provided directly (use prescribedBC.m). 't', 'l', 'r' and 'b' represents top, left, right and bottom edges of retangular domain (tbr in next updates)
-pc = prescribedBC(x,stresses); % SET YOUR BCs IN THIS FUNCTION
-[ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,stresses,m,h,A,3,stress_app,pc,damage);
+pc = prescribedBC(x,horizon); % SET YOUR BCs IN THIS FUNCTION
+[ndof,idb,bc_set,bodyForce,noFailZone] = mesh.boundaryCondition(x,[],m,h,A,3,stress_app,pc,damage);
 
 % -------------- GENERATE FAMILY ------------------
 [family,partialAreas,maxNeigh,surfaceCorrection] = neighborhood.generateFamily_v2(x,A,horizon,m,1,false,PA_alg,SE_alg); % PA Algs: FA (choose for inhomogeneous mesh), PA-HHB and PA-AC. SE Algs: "None", "Volume"
@@ -71,9 +70,10 @@ switch solver
         if damage.damageOn
             error('Disable damage to run a quasi-static solver')
         end
-        n_tot = 4; % Number of load steps
+        n_tot = 1; % Number of load steps
         [u_n,r,energy] = solvers.solver_QuasiStatic(x,n_tot,idb,bodyForce,bc_set,family,partialAreas,surfaceCorrection,modelo,par_omega,ndof,A,damage,noFailZone);
         out.x = x; out.un = u_n; out.energy = energy;
+        save('teste.mat','x','idb','u_n','energy');
     case "Quasi-Static Explicit"
         load_par.n_iterMax = 50;
         load_par.n_load = 100; % Number of load steps

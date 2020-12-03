@@ -18,7 +18,7 @@ function W = strainEnergyDensity(x,u,theta,family,partialAreas,surfaceCorrection
     norma = vecnorm(xi')';
     s = (vecnorm(xi'+eta')' - norma)./norma;
     switch model.number
-        case 1 % PMB
+        case 1 % PMB DTT
             if nargin > 11 && damage.damageOn
                 noFail = damage.noFail(ii) | damage.noFail(jj);
                 mu = damageFactor(historyS(neigh_ind)',ii,neigh_ind,damage,noFail,model); % NoFail not required

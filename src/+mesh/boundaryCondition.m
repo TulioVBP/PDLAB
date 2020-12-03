@@ -75,9 +75,12 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
             if ~isempty(pc.vel) || ~isempty(pc.disp)
                 [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
                 bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
+                [~, I, ~] = unique(bc_set(:,1));
+                bc_set = bc_set(I,:); % Solving for repeated constraints
             else
                 bc_set = [];
             end
+       
             % - Traction forces
             if ~isempty(pc.bodyForce)
                 if length(size(pc.bodyForce)) == 2

@@ -1,7 +1,7 @@
 % Explicit time - dynamic solver
 
-function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,T,c,rho,model,par_omega,history,noFailZone,damage,b_parll,data_dump)
-    if nargin < 19 % No data dump
+function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,t,idb,body_force,bc_set,familyMat,A,partialAreas,surfaceCorrection,rho,model,par_omega,noFailZone,damage,b_parll,data_dump)
+    if nargin < 15 % No data dump
         data_dump = 1;
     end
     ndof = 2*length(x) - size(bc_set,1);
@@ -13,16 +13,16 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
     % {No fail to damage variable}
     damage.noFail = noFailZone;   
     %% Verify if dt is small enough
-    dt = abs(t(2) - t(1));
-    dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c,rho,model);
-    dt_ratio = dt/dt_crit;
-    if dt_ratio < 1 && dt_crit > 0
-        disp("Time-step " + num2str(dt) +" sec < critical time-step, " + num2str(dt_crit) + ...
-            " sec. Safety factor: " + num2str(dt_ratio) + ". The simulation should converge.")
-    elseif dt > 0
-       disp("Time-step " + num2str(dt) + " sec > critical time-step, " + num2str(dt_crit) + ...
-            " sec. Safety factor: " + num2str(dt_ratio)+ ". The simulation shall explode.")
-    end
+     dt = abs(t(2) - t(1));
+%     dt_crit = criticalTimeStep(x,familyMat,partialAreas,par_omega,c,rho,model);
+%     dt_ratio = dt/dt_crit;
+%     if dt_ratio < 1 && dt_crit > 0
+%         disp("Time-step " + num2str(dt) +" sec < critical time-step, " + num2str(dt_crit) + ...
+%             " sec. Safety factor: " + num2str(dt_ratio) + ". The simulation should converge.")
+%     elseif dt > 0
+%        disp("Time-step " + num2str(dt) + " sec > critical time-step, " + num2str(dt_crit) + ...
+%             " sec. Safety factor: " + num2str(dt_ratio)+ ". The simulation shall explode.")
+%     end
     %% Defining the node's degree of freedom index
     dof_vec = zeros(size(x));
     for kk = 1:length(x)
@@ -30,8 +30,8 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
     end
     %% {Defining cracking trespassing matrix}
     crackSegments = size(damage.crackIn,1); % At least 2
-    damage.checkCrack = zeros(size(history.S));
-    for ii = 1:size(history.S)
+    damage.checkCrack = zeros(size(model.history.S));
+    for ii = 1:size(model.history.S,1)
         x_j = x(familyMat(ii,familyMat(ii,:)~=0),:);
         check = zeros(size(x_j,1),crackSegments-1);
         for kk = 1:crackSegments-1
@@ -51,9 +51,6 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
     end
     disp('Check for broken bonds done.')
     %% INITIALIZE SIMULATION MATRICES
-        %if b_parll
-            %poolobj = parpool(2);
-        %end
         Minv = 1/rho; % Diagonal and with the same value: scalar
         phi = zeros(length(x),length(t)); % No initial damage
         % Initial condition
@@ -73,7 +70,11 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             end
             flag_bf_constant = false;
         end
-        n_sample = [1 data_dump:data_dump:length(t)];
+        if data_dump > 1
+            n_sample = [1 data_dump:data_dump:length(t)];
+        else
+            n_sample = data_dump:data_dump:length(t);
+        end
         if n_sample(end)~=length(t)
             n_sample = [n_sample length(t)];
         end
@@ -82,15 +83,19 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         energy.KE = zeros(length(x),length(n_sample));
         energy.EW = zeros(length(x),length(n_sample));
         energy_ext_var = zeros(length(x),1); % External energy that takes into account variable body force (velocity constraints)
+        F_load = zeros(length(n_sample),2);
         fn = zeros(2*length(x),1); % Initial force
         u_const = zeros(length(v_n)-(ndof),1); % Constraint nodes
         % Temporary variables
-        history_tempS = history.S;
-        if model.dilatation 
-            history_tempT = history.theta;
+        history.S = model.history.S; %
+        if model.b_dilatation 
+             history.T = model.history.theta;
+        else
+             history.T = [];
         end
         fn_temp = zeros(size(x));
         phi_temp = zeros(length(x),1);
+        
         % {Recoverying temporary files}
         n_initial = 1;
         if exist('tempsim.mat','file')
@@ -125,15 +130,15 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             % ---- {Evaluating dilatation} ----
             theta = zeros(length(x),1); % Preallocate theta
             damage.phi = phi(:,n); % Accessing current damage situation
-            if model.dilatation
+            if model.b_dilatation
                 if b_parll
                     parfor ii = 1:length(x)
-                        [theta(ii),history_tempT(ii)] = dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,c,model,damage,history,dt);
+                        [theta(ii),history_T(ii)] = model.dilatation(x,u2,familyMat(ii,:),partialAreas(ii,:),surfaceCorrection(ii,:),ii,idb,par_omega,damage,history.T(ii));
                     end
                 else
-                    [theta,history_tempT] = dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,c,model,damage,history,dt);
+                    [theta,history_T] = model.dilatation(x,u2,familyMat,partialAreas,surfaceCorrection,[],idb,par_omega,damage,history.S,history.T);
                 end
-                history.theta = history_tempT; % Assigning up-to-date history variable
+                history.theta = history_T; % Assigning up-to-date history variable
             end
             
             % ####### Step 3 - Update velocity 
@@ -144,18 +149,18 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
             b_Weval = rem(n+1,data_dump) == 0 || n+1 == length(t); % Deciding when to evaluate the energy
             if b_parll
                 parfor ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history.S(ii,:),history_T,dt,A,body_force,theta,b_Weval,bc_set);
                 end
             else 
                 for ii = 1:length(x)
-                   [fn_temp(ii,:),history_tempS(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi(:,n),dt,history,T,A,body_force,theta,b_Weval,bc_set);
+                   [fn_temp(ii,:),history_S(ii,:),phi_temp(ii),energy_pot(ii)] = parFor_loop(x,u2,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi(:,n),history,dt,A,body_force,theta,b_Weval,bc_set);
                 end
             end
+            history.S = history_S;
             % Converting the temporary variables
             for ii = 1:length(x)
                 fn(dof_vec(ii,:)) = fn_temp(ii,:)';
             end
-            history.S = history_tempS; % Updating the history variable related to the stretch
             phi(:,n+1) = phi_temp;
             % Evaluate V(n+1)
             v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof,1)); % V(n+1) is stored in the next V(n) using f n+1 and b n+1
@@ -197,6 +202,8 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                     dofk = dof_vec(kk,:);
                     energy.KE(kk,index_s) =  1/2*rho*norm(v_n(dofk,1))^2.*A(kk);
                 end
+                % Calculating load 
+                F_load(index_s,:) = fload(x,u2,familyMat,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,A,bc_set,idb,ndof); 
             else
                  % {External incremental work only}
                 BBN = bn(:,1);
@@ -220,6 +227,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
                     ind_vel  = ind_vel - (ind_vel > size(dof_vec,1))*size(dof_vec,1);
                     energy_ext_var(ind_vel) = energy_ext_var(ind_vel)+ add_ext(gg).*A(ind_vel);
                 end
+                
             end
             
             %% ############ COUNTING THE PROCESSING TIME #############
@@ -230,6 +238,7 @@ function [t_s,u_n,phi,energy,history,time_up] = solver_DynamicExplicit(x,t,idb,b
         % Sampling the results
         [u_n] = sampling(u_n,t,t_s);
         [phi] = sampling(phi,t,t_s);
+        %history.S = history_S;
 end
 %%
 function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
@@ -254,23 +263,18 @@ function dt_crit = criticalTimeStep(x,family,partialAreas,par_omega,c,rho,model)
     dt_crit = min(dt); % Critical time step
 end
 %%
-function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,c,model,damage,phi,dt,history,T,A,body_force,theta,b_Weval,bc_set)
-   %dofi = dof_vec(ii,:);
+function [f_i,history_S_up,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,familyMat,partialAreas,surfaceCorrection,par_omega,model,damage,phi,history,dt,A,body_force,theta,b_Weval,bc_set)
    % Loop on the nodes
-   %areaTot = 0; partialDamage = 0; % Instatiate for damage index
    family = familyMat(ii,familyMat(ii,:)~=0);
-   %f_i = 0;
-   history_upS = history.S(ii,:);
-   %damage.phi = phi(ii);
    neig_index = 1:length(family);
    jj = family(neig_index);
    % Loop on their neighbourhood
+   history_S_up = history.S(ii,:);%(neig_index); 
    noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
-   if model.dilatation
-      %[fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,dof_vec,familyMat,partialAreas,neig_index,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,theta,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),history.theta,noFail);
+   if model.b_dilatation
+      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,[ ],damage,history_S_up(neig_index),history.theta,noFail);
    else
-      [fij,history_upS(neig_index),mu_j] = T(x,u_n,ii,jj,dof_vec,par_omega,c,model,[ ],damage,dt,history.S(ii,neig_index),noFail);
+      [fij,history_S_up(neig_index),mu_j] = model.T(x,u_n,ii,jj,dof_vec,par_omega,[ ],damage,history_S_up(neig_index),noFail);
    end
    Vj = partialAreas(ii,neig_index)';
    lambda = surfaceCorrection(ii,neig_index)';
@@ -280,11 +284,11 @@ function [f_i,history_upS,phi_up,energy_pot] = parFor_loop(x,u_n,dof_vec,idb,ii,
    partialDamage = sum(mu_j.*Vj);
    phi_up = 1 - partialDamage/areaTot;
    if b_Weval
-       if ~model.dilatation
+       if ~model.b_dilatation
            % Strain energy
-           W = strainEnergyDensity(x,u_n,[],familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(1,neig_index),[]);
+           W = model.strainEnergyDensity(x,u_n,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index));
        else
-           W = strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,c,model,damage,history_upS(neig_index),history.theta); % neig_index == length(family)
+           W = model.strainEnergyDensity(x,u_n,theta,familyMat(ii,neig_index),partialAreas(ii,neig_index),surfaceCorrection(ii,neig_index),ii,idb,par_omega,damage,history_S_up(neig_index),history.theta); % neig_index == length(family)
        end
        % Stored strain energy
        energy_pot = W.*A(ii);
@@ -298,4 +302,40 @@ function [xs] = sampling(x,t,ts)
     for iii = 1:size(x,1)
         xs(iii,:) = interp1(t,x(iii,:),ts);
     end
+end
+
+%% Calculating load
+function F = fload(x,u,family,dof_vec,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta,V,bc_set,idb,ndof) 
+F = [0, 0];
+const_dof = find(idb > ndof);
+if ~isempty(bc_set)
+    load_dof = const_dof(bc_set(:,3)~= 0);
+    load_points = ceil(load_dof/2);
+    load_points = unique(load_points);
+    for kk = 1:length(load_points)
+        ii = load_points(kk);
+        family_ii = family(ii,family(ii,:)>0);
+        neig_index = 1:length(family_ii);
+        partialAreas_ii = partialAreas(ii,family(ii,:)>0);
+        surfaceCorrection_ii = surfaceCorrection(ii,family(ii,:)>0);
+        f_i = forceSection(x,u,dof_vec,ii,family_ii,neig_index, partialAreas_ii,surfaceCorrection_ii,par_omega,model,damage,history,theta);
+        F = F - f_i*V(ii);
+    end
+end
+end
+
+function f_i = forceSection(x,u_n,dof_vec,ii, family, neig_index,partialAreas,surfaceCorrection,par_omega,model,damage,history,theta)
+   jj = family;
+   % Loop on their neighbourhood
+   noFail = damage.noFail(ii) | damage.noFail(jj); % True if node ii or jj is in the no fail zone
+   Vj = partialAreas';
+   if model.b_dilatation
+      [fij,~,~] = model.T(x,u_n,theta,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),history.theta,noFail);
+   else
+      [fij,~,~] = model.T(x,u_n,ii,jj,dof_vec,par_omega,Vj,damage,history.S(ii,neig_index),noFail);
+   end
+   lambda = surfaceCorrection';
+   
+   f_i = sum(fij.*Vj.*lambda);
+   
 end

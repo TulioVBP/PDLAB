@@ -1,6 +1,6 @@
 %% IMPLEMENTATION OF QUASI-STATICS SOLVER - Algorithm
 
-function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,A,surfaceCorrection,T,ndof,par_omega,c,model,damage,history)
+function K = tangentStiffnessMatrix(x,u,idb,family,partialAreas,A,surfaceCorrection,ndof,par_omega,model,damage,history)
 h = norm(x(1,:) - x(2,:)); % Nodal spacing
 epsilon = h*1e-7; % According to the roadmap
 N = length(u);
@@ -15,7 +15,7 @@ K = zeros(N,N);
 %% Transverse each node in the discretization
 timerVal = tic;
 for ii=1:length(x)
-    if model.dilatation % The system has dilatation
+    if model.b_dilatation % The system has dilatation
         transvList = [ii family(ii,family(ii,:)~=0)];
         li = length(transvList);
         neighIndex = 1;
@@ -40,10 +40,10 @@ for ii=1:length(x)
             
             % {Evaluate related dilatation}
             theta_plus = zeros(length(x),1); theta_minus = zeros(length(x),1);
-            if model.dilatation
+            if model.b_dilatation
                 transvListII = [ii family(ii,family(ii,:)~=0)]; % Transversal list of affected dilatations
-                theta_plus(transvListII) = dilatation(x,u_plus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,c,model);
-                theta_minus(transvListII) = dilatation(x,u_minus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,c,model);
+                theta_plus(transvListII) = model.dilatation(x,u_plus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,damage,history.S,history.theta);
+                theta_minus(transvListII) = model.dilatation(x,u_minus,family(transvListII,:),partialAreas(transvListII,:),surfaceCorrection(transvListII,:),transvListII,idb,par_omega,damage,history.S,history.theta);
             end
             % -- 
             
@@ -51,12 +51,12 @@ for ii=1:length(x)
                 kk = family(ii,family(ii,:)~=0);
                 neigh_index = 1:length(kk);
                 dofi = dof_vec(ii,:);
-                if model.dilatation
-                    [T_plus,~,~] = T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,c,model,[],damage,0,history.S(ii,neigh_index),history.theta,[]);
-                    [T_minus,~,~] = T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,c,model,[],damage,0,history.S(ii,neigh_index),history.theta,[]);
+                if model.b_dilatation
+                    [T_plus,~,~] = model.T(x,u_plus,theta_plus,ii,kk,dof_vec,par_omega,[],damage,history.S(ii,neigh_index),history.theta,[]);
+                    [T_minus,~,~] = model.T(x,u_minus,theta_minus,ii,kk,dof_vec,par_omega,[],damage,history.S(ii,neigh_index),history.theta,[]);
                 else
-                    [T_plus,~,~] = T(x,u_plus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
-                    [T_minus,~,~] = T(x,u_minus,ii,kk,dof_vec,par_omega,c,model,[],damage,[],history.S(ii,neigh_index),[]);
+                    [T_plus,~,~] = model.T(x,u_plus,ii,kk,dof_vec,par_omega,[],damage,history.S(ii,neigh_index),[]);
+                    [T_minus,~,~] = model.T(x,u_minus,ii,kk,dof_vec,par_omega,[],damage,history.S(ii,neigh_index),[]);
                 end
                 f_plus = T_plus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*A(ii); % S_max set to zero
                 f_minus = T_minus.*partialAreas(ii,neigh_index)'.*surfaceCorrection(ii,neigh_index)'.*A(ii); % S_max set to zero again
@@ -76,13 +76,6 @@ end
 %% Adapting for the constrained dofs
 for ii = ndof+1:length(u)
     K(ii,:) = zeros(size(K(ii,:)));
-    K(ii,ii) = -1e10; % Penalty
+    K(ii,ii) = 1e10; % Penalty
 end
 end
-% if sum(dofj > ngdl) == 2
-%             % Both the dof are constrained
-%             dofj = [];
-%         elseif sum(dofj>ngdl) == 1
-%             % One of the dof is constrained
-%             dofj = dofj(dofj<= ngdl);
-%         end

@@ -37,7 +37,7 @@ function [f,history,mu] = interactionForce_PMBDTT(x,u,ii,jj,dof_vec,par_omega,c,
         noFail = [];
     end
     % Evaluating the force interaction
-    f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S.*mu,damage,noFail,ii).*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
+    f = c(1)*influenceFunction(norma,par_omega).*norma.*fscalar(S,damage,noFail,ii).*mu.*ee; % Influence function times norma because the omega_d used is related to the original influence function by omega_d = omega*|\xi|  
 end
 
 function ff = fscalar(x,damage,noFail,ii)
