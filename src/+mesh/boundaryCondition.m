@@ -74,7 +74,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
                     bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
                 elseif length(size(pc.vel)) == 3
                     dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2,1)),1,1))-1; 2*pc.vel(logical(pc.vel(:,3,1)),1,1)]; % [boolean boolean value value] ncons x 2 x nt 
-                    dof_velocity_constraint(:,2) = [logical(pc.vel(:,2,1))*1; logical(pc.vel(:,3,1))*1]; % Values
+                    dof_velocity_constraint(:,2) = [pc.vel((pc.vel(:,2,1)) == 1),2,1); pc.vel((pc.vel(:,3,1)) == 1),3,1)]; % Values
                     % CONSIDERAR QUE PC DISP NÃO TA SENDO CONSIDERANDO
                     bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)]; % [dof disp vel]
                 end
