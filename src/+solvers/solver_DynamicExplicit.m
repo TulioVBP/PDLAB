@@ -127,7 +127,7 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
                 bn = body_force(:,n:n+1); % Increment b (n is used for evaluating v_n+1/2 and n+1 to evaluate v_n+1)
             end
             if ~flag_bcset_constant
-                bc_set = reshape(bc_set(:,:,n),size(bc_set,1),3)
+                bc_set = reshape(bc_set3(:,:,n),size(bc_set3,1),3)
             end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
