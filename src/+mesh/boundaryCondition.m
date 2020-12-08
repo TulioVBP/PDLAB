@@ -59,6 +59,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
         case 3
             % Different prescribed case
             % - Displacement
+            bc_set = [];
             if ~isempty(pc.disp)
                 dof_disp_constraint(:,1) = [2*(pc.disp(logical(pc.disp(:,2)),1))-1; 2*pc.disp(logical(pc.disp(:,3)),1)]; % [node boolean boolean value value]
                 dof_disp_constraint(:,2) = [pc.disp(logical(pc.disp(:,2)),4); pc.disp(logical(pc.disp(:,3)),5)]; % Values
@@ -74,7 +75,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
                     bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
                 elseif length(size(pc.vel)) == 3
                     dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2,1)),1,1))-1; 2*pc.vel(logical(pc.vel(:,3,1)),1,1)]; % [boolean boolean value value] ncons x 2 x nt 
-                    dof_velocity_constraint(:,2) = [pc.vel((pc.vel(:,2,1)) == 1),2,1); pc.vel((pc.vel(:,3,1)) == 1),3,1)]; % Values
+                    dof_velocity_constraint(:,2) = [pc.vel((pc.vel(:,2,1)) == 1,2,1); pc.vel((pc.vel(:,3,1)) == 1,3,1)]; % Values
                     % CONSIDERAR QUE PC DISP NÃO TA SENDO CONSIDERANDO
                     bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)]; % [dof disp vel]
                 end
@@ -191,14 +192,14 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
 
    %% BC SET 3D 
     if length(size(pc.vel)) == 3
-        dof_velocity_constraint(:,1,:) = [2*(pc.vel(logical(pc.vel(:,2,:)),1,:))-1; 2*pc.vel(logical(pc.vel(:,3,:)),1,:)]; % [boolean boolean value value] ncons x 2 x nt 
-        dof_velocity_constraint(:,2,:) = [pc.vel(logical(pc.vel(:,2,:)),4,:); pc.vel(logical(pc.vel(:,3,:)),5,:)]; % Values
+        dof_velocity_constraint3(:,1,:) = [2*(pc.vel(logical(pc.vel(:,2,1)),1,:))-1; 2*pc.vel(logical(pc.vel(:,3,1)),1,:)]; % [boolean boolean value value] ncons x 2 x nt 
+        dof_velocity_constraint3(:,2,:) = [pc.vel(logical(pc.vel(:,2,1)),4,:); pc.vel(logical(pc.vel(:,3,1)),5,:)]; % Values
         % CONSIDERAR QUE PC DISP NÃO TA SENDO CONSIDERANDO
-        bc_set3 = [dof_velocity_constraint(:,1,:),zeros(size(dof_velocity_constraint(:,1,:))), dof_velocity_constraint(:,2,:)]; % [dof disp vel]
-        [bc_set3(:,1,:),II] = sort(bc_set3(:,1,:)); % Sorting in ascending order
-        bc_set3(:,2:3,:) = bc_set3(II,2:3,:); % Rearranging the displacement and velocity accordingly
+        bc_set3 = [dof_velocity_constraint3(:,1,:),zeros(size(dof_velocity_constraint3(:,1,:))), dof_velocity_constraint3(:,2,:)]; % [dof disp vel]
+        [~,II] = sort(bc_set3(:,1,1)); % Sorting in ascending order
+        bc_set3 = bc_set3(II,:,:); % Rearranging the displacement and velocity accordingly
         [~, I, ~] = unique(bc_set3(:,1,1));
         bc_set3 = bc_set3(I,:,:); % Solving for repeated constraints
-        bc_set = {bc_set, bc_set3} % Making bc_set a cell
+        bc_set = {bc_set, bc_set3}; % Making bc_set a cell
     end
 end

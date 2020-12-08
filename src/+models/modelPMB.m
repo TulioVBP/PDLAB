@@ -42,6 +42,9 @@ classdef modelPMB
             elseif par_omega(2) == 1 && par_omega(3) == 1
                 l = 3;
                 obj.damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
+            elseif par_omega(2) == 2 && par_omega(3) == 0
+                l = 3;
+                obj.damage.Sc = sqrt(G0*(1/3+1)*pi^(3/2)/8/E*(l/horizon));
             else
                 warning('Critical bond not defined.')
             end

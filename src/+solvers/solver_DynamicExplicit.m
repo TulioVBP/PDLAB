@@ -4,7 +4,11 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
     if nargin < 15 % No data dump
         data_dump = 1;
     end
-    ndof = 2*length(x) - size(bc_set,1);
+    if iscell(bc_set)
+        ndof = 2*length(x) - size(bc_set{2},1);
+    else
+        ndof = 2*length(x) - size(bc_set,1);
+    end
     %% Create volume
     h = norm(x(1,:)-x(2,:));
     if length(A)== 1
@@ -97,18 +101,19 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
         phi_temp = zeros(length(x),1);
 
         % Unraveling bc_set?
-        b_bcset_constant = true
+        flag_bcset_constant = true;
         if iscell(bc_set)
-            bc_set3 = bc_set{2}
-            bc_set = bc_set{1}
-            if length(bc_set3) ~= 0
-                b_bcset_constant = false
+            bc_set3 = bc_set{2};
+            bc_set = bc_set{1};
+            if ~isempty(bc_set3)
+                flag_bcset_constant = false;
                 if size(bc_set3,3) ~= length(t)
-                    vel_set_temp = zeros([size(bc_set3,1),length(t)])
+                    vel_set_temp = zeros([size(bc_set3,1),length(t)]);
                     for iii = 1:size(bc_set3,1)
                         vel_set_temp(iii,:) = interp1(0:size(bc_set3,3)-1,reshape(bc_set3(iii,3,:),1,[]),(0:length(t)-1)*(size(bc_set3,3)-1)/(length(t)-1));
                     end
-                    bc_set3(:,3,:) = reshape(vel_set_temp,size(vel_set_temp,1),1,[])
+                    bc_set3 = repmat(bc_set3(:,:,1),1,1,size(vel_set_temp,2));
+                    bc_set3(:,3,:) = reshape(vel_set_temp,size(vel_set_temp,1),1,[]);
                 end
             end
         end
@@ -127,7 +132,7 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
                 bn = body_force(:,n:n+1); % Increment b (n is used for evaluating v_n+1/2 and n+1 to evaluate v_n+1)
             end
             if ~flag_bcset_constant
-                bc_set = reshape(bc_set3(:,:,n),size(bc_set3,1),3)
+                bc_set = reshape(bc_set3(:,:,n),size(bc_set3,1),3);
             end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
