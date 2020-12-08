@@ -95,6 +95,23 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
         end
         fn_temp = zeros(size(x));
         phi_temp = zeros(length(x),1);
+
+        % Unraveling bc_set?
+        b_bcset_constant = true
+        if iscell(bc_set)
+            bc_set3 = bc_set{2}
+            bc_set = bc_set{1}
+            if length(bc_set3) ~= 0
+                b_bcset_constant = false
+                if size(bc_set3,3) ~= length(t)
+                    vel_set_temp = zeros([size(bc_set3,1),length(t)])
+                    for iii = 1:size(bc_set3,1)
+                        vel_set_temp(iii,:) = interp1(0:size(bc_set3,3)-1,reshape(bc_set3(iii,3,:),1,[]),(0:length(t)-1)*(size(bc_set3,3)-1)/(length(t)-1));
+                    end
+                    bc_set3(:,3,:) = reshape(vel_set_temp,size(vel_set_temp,1),1,[])
+                end
+            end
+        end
         
         % {Recoverying temporary files}
         n_initial = 1;
@@ -107,7 +124,10 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
         for n = n_initial:length(t)-1
             % Instatiate body force
             if ~flag_bf_constant
-                bn = body_force(:,n:n+1); % Increment b
+                bn = body_force(:,n:n+1); % Increment b (n is used for evaluating v_n+1/2 and n+1 to evaluate v_n+1)
+            end
+            if ~flag_bcset_constant
+                bc_set = reshape(bc_set(:,:,n),size(bc_set,1),3)
             end
             %% ############ VELOCITY VERLET ALGORITHM ###############
             % ---- Solving for the dof ----
@@ -120,7 +140,7 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
                 if sum(bc_set(:,3) ~= 0 & bc_set(:,2) ~= 0)
                     error('The boundary condition matrix bc_set has prescribed both displacement and velocity for the same node.')
                 end
-                u_const(bc_set(:,3) == 0) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity
+                u_const(bc_set(:,3) == 0 & flag_bcset_constant) = bc_set(bc_set(:,3) == 0,2); % Defining the displacements for the nodes with no velocity, when the velocity is constant. If vel changes, it can be zero.
                 u_const = u_const + bc_set(:,3)*dt; % Updating the velocity constraint nodes
                 u_n(ndof+1:end,n+1) = u_const;
             end
@@ -163,7 +183,7 @@ function [t_s,u_n,phi,energy,history,time_up,F_load] = solver_DynamicExplicit(x,
             end
             phi(:,n+1) = phi_temp;
             % Evaluate V(n+1)
-            v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof,1)); % V(n+1) is stored in the next V(n) using f n+1 and b n+1
+            v_n(1:ndof,1) = v_n(1:ndof,2) + dt/2*Minv*(fn(1:ndof) + bn(1:ndof,2)); % V(n+1) is stored in the next V(n) using f n+1 and b n+1
             
             %% Evaluating energy
             if b_Weval

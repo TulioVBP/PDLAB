@@ -20,6 +20,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
 %           third collumn contains the corresponding dof velocity
 % - bb: the actual body force vector
 % - noFail: set of nodes for which we have no fail condition (mu = 1 always)
+% -     bc_set3: bc_set but in 3D - returned if bc_set is a cell
 
     %% DEFINE THE BOUNDARY CONDITIONS
     switch option
@@ -67,16 +68,23 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
             end
             % - Velocity
             if ~isempty(pc.vel)
-                dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2)),1))-1; 2*pc.vel(logical(pc.vel(:,3)),1)]; % [boolean boolean value value]
-                dof_velocity_constraint(:,2) = [pc.vel(logical(pc.vel(:,2)),4); pc.vel(logical(pc.vel(:,3)),5)]; % Values
-                bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
+                if length(size(pc.vel)) == 2
+                    dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2)),1))-1; 2*pc.vel(logical(pc.vel(:,3)),1)]; % [boolean boolean value value]
+                    dof_velocity_constraint(:,2) = [pc.vel(logical(pc.vel(:,2)),4); pc.vel(logical(pc.vel(:,3)),5)]; % Values
+                    bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)];
+                elseif length(size(pc.vel)) == 3
+                    dof_velocity_constraint(:,1) = [2*(pc.vel(logical(pc.vel(:,2,1)),1,1))-1; 2*pc.vel(logical(pc.vel(:,3,1)),1,1)]; % [boolean boolean value value] ncons x 2 x nt 
+                    dof_velocity_constraint(:,2) = [logical(pc.vel(:,2,1))*1; logical(pc.vel(:,3,1))*1]; % Values
+                    % CONSIDERAR QUE PC DISP NÃO TA SENDO CONSIDERANDO
+                    bc_set = [bc_set; dof_velocity_constraint(:,1),zeros(size(dof_velocity_constraint(:,1))), dof_velocity_constraint(:,2)]; % [dof disp vel]
+                end
             end
             
             if ~isempty(pc.vel) || ~isempty(pc.disp)
-                [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
-                bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
-                [~, I, ~] = unique(bc_set(:,1));
-                bc_set = bc_set(I,:); % Solving for repeated constraints
+                    [bc_set(:,1),II] = sort(bc_set(:,1)); % Sorting in ascending order
+                    bc_set(:,2:3) = bc_set(II,2:3); % Rearranging the displacement and velocity accordingly
+                    [~, I, ~] = unique(bc_set(:,1));
+                    bc_set = bc_set(I,:); % Solving for repeated constraints
             else
                 bc_set = [];
             end
@@ -97,7 +105,7 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
     end
     
     %% DEFINE THE IDB VECTOR
-    ndof = 2*length(x) - length(bc_set);
+    ndof = 2*length(x) - size(bc_set,1);
     %in_ndof = 1:2*length(x);
     idb = zeros(2*length(x),1);
     id_dof = 1;
@@ -180,4 +188,17 @@ function [ndof,idb,bc_set,bb,noFail] = boundaryCondition(x,stresses,m,h,A,option
    title('Boundary conditions')
    set(gca,'FontSize',13)
    pause(1)
+
+   %% BC SET 3D 
+    if length(size(pc.vel)) == 3
+        dof_velocity_constraint(:,1,:) = [2*(pc.vel(logical(pc.vel(:,2,:)),1,:))-1; 2*pc.vel(logical(pc.vel(:,3,:)),1,:)]; % [boolean boolean value value] ncons x 2 x nt 
+        dof_velocity_constraint(:,2,:) = [pc.vel(logical(pc.vel(:,2,:)),4,:); pc.vel(logical(pc.vel(:,3,:)),5,:)]; % Values
+        % CONSIDERAR QUE PC DISP NÃO TA SENDO CONSIDERANDO
+        bc_set3 = [dof_velocity_constraint(:,1,:),zeros(size(dof_velocity_constraint(:,1,:))), dof_velocity_constraint(:,2,:)]; % [dof disp vel]
+        [bc_set3(:,1,:),II] = sort(bc_set3(:,1,:)); % Sorting in ascending order
+        bc_set3(:,2:3,:) = bc_set3(II,2:3,:); % Rearranging the displacement and velocity accordingly
+        [~, I, ~] = unique(bc_set3(:,1,1));
+        bc_set3 = bc_set3(I,:,:); % Solving for repeated constraints
+        bc_set = {bc_set, bc_set3} % Making bc_set a cell
+    end
 end
